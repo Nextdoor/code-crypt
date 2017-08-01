@@ -1,0 +1,19 @@
+# secrets
+secrets*.json
+**/secrets*.json
+
+# dev environment
+.venv/*
+dist
+build
+zuul_alpha.egg-info
+
+# zuul keys and secrets
+zuul_data
+**/zuul_data
+
+# temp files
+*.pyc
+**/*.pyc
+tmp
+**/tmp
