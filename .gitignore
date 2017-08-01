@@ -3,7 +3,7 @@ secrets*.json
 **/secrets*.json
 
 # dev environment
-.venv/*
+.venv
 dist
 build
 zuul_alpha.egg-info
