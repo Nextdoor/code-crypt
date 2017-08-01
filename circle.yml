@@ -9,15 +9,15 @@ jobs:
           name: install dependencies
           command: |
             virtualenv .venv
-            . venv/bin/activate
+            source .venv/bin/activate
             make init
       - run:
           name: run tests
           command: |
-            . venv/bin/activate
+            source .venv/bin/activate
             make test
       - run:
           name: lint
           command: |
-            . venv/bin/activate
+            source .venv/bin/activate
             make lint
