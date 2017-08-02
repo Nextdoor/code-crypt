@@ -19,6 +19,7 @@ DATA_DIR = tempfile.mkdtemp()
 ENV = 'test'
 EXT = '.enc'
 RSA_KEY_SIZE = 1024
+CHUNK_SIZE = 86
 KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
 TEST_VALID_JSON = """{
@@ -69,6 +70,21 @@ CPnruX3rsO07qAmw9oI4wnbw9vNaZXBXSnIBqEH4pQbAmvIAgSW8TPB4rLgqG6ggkn1DQD7GB3kMOWs
 Kdc1LG8Q/7xcAxpbYQADhxiyjMycHeFLkksDK/y9Yv4j5MK6aFrHYls41/ATklPH/wqjRZfcsS/ZeTU
 lDNU8tcQ=="""
 
+# Sample RSA Private Key
+LARGE_SECRET = """-----BEGIN RSA PRIVATE KEY-----
+MIICXAIBAAKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUp
+wmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ5
+1s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQABAoGAFijko56+qGyN8M0RVyaRAXz++xTqHBLh
+3tx4VgMtrQ+WEgCjhoTwo23KMBAuJGSYnRmoBZM3lMfTKevIkAidPExvYCdm5dYq3XToLkkLv5L2
+pIIVOFMDG+KESnAFV7l2c+cnzRMW0+b6f8mR1CJzZuxVLL6Q02fvLi55/mbSYxECQQDeAw6fiIQX
+GukBI4eMZZt4nscy2o12KyYner3VpoeE+Np2q+Z3pvAMd/aNzQ/W9WaI+NRfcxUJrmfPwIGm63il
+AkEAxCL5HQb2bQr4ByorcMWm/hEP2MZzROV73yF41hPsRC9m66KrheO9HPTJuo3/9s5p+sqGxOlF
+L0NDt4SkosjgGwJAFklyR1uZ/wPJjj611cdBcztlPdqoxssQGnh85BzCj/u3WqBpE2vjvyyvyI5k
+X6zk7S0ljKtt2jny2+00VsBerQJBAJGC1Mg5Oydo5NwD6BiROrPxGo2bpTbu/fhrT8ebHkTz2epl
+U9VQQSQzY1oZMVX8i1m5WUTLPz2yLJIBQVdXqhMCQBGoiuSoSjafUhV7i1cEGpb88h5NBYZzWXGZ
+37sJ5QsW+sJyoNde3xH8vdXhzU7eT82D6X/scw9RZz+/6rCJ4p0=
+-----END RSA PRIVATE KEY-----"""
+
 
 class TestGenerateKeyPair(unittest.TestCase):
 
@@ -77,7 +93,9 @@ class TestGenerateKeyPair(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
         self.expected_public_key_file = os.path.join(
             DATA_DIR, 'keys', ENV, 'public_key.asc')
@@ -111,12 +129,14 @@ class TestGenerateKeyPair(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
         self.zuul.kms.encrypt.return_value = {
                 'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
 
-        self.zuul.generate_key_pair(key_size=RSA_KEY_SIZE)
+        self.zuul.generate_key_pair()
 
         mock_client.assert_called_with('kms', region_name='us-east-1')
 
@@ -153,7 +173,9 @@ class TestImportSecrets(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
     def test_import_secrets_with_invalid_secrets_json(self):
         self.assertRaises(
@@ -195,7 +217,9 @@ class TestDecrypt(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
     def test_decrypt_with_missing_private_key_file(self):
         self.assertRaises(errors.InputError, lambda: self.zuul.decrypt('FOO'))
@@ -207,11 +231,7 @@ class TestDecrypt(unittest.TestCase):
 
     def test_decrypt_with_missing_secret(self):
         decrypted_result = self.zuul.decrypt('FOO', TEST_PLAINTEXT_PRIVATE_KEY)
-        self.assertIsNone(decrypted_result)
-
-    def test_decrypt_with_plaintext_private_key(self):
-        decrypted_result = self.zuul.decrypt('FOO', TEST_PLAINTEXT_PRIVATE_KEY)
-        self.assertIsNone(decrypted_result)
+        self.assertEquals(decrypted_result, '')
 
     def test_decrypt_secret_with_plaintext_private_key(self):
         self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_CCC', 'CCC')
@@ -241,7 +261,9 @@ class TestDecrypt(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -252,6 +274,29 @@ class TestDecrypt(unittest.TestCase):
         mock_client.assert_called_with('kms', region_name='us-east-1')
 
         self.assertEqual(decrypted_result, secret)
+
+    @mock.patch("boto3.client")
+    def test_decrypt_large_secret_with_kms(self, mock_client):
+        self.zuul.encrypt('SECRET_NAME_DDD', LARGE_SECRET, TEST_PUBLIC_KEY)
+        mock_client.return_value = mock.MagicMock()
+
+        self.zuul = zuul_alpha.Zuul(
+            kms_key_id=KMS_KEY_ID,
+            data_dir=DATA_DIR,
+            env=ENV,
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
+
+        self.zuul.kms.decrypt.return_value = {
+            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        decrypted_result = self.zuul.decrypt(
+            'SECRET_NAME_DDD',
+            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
+
+        mock_client.assert_called_with('kms', region_name='us-east-1')
+
+        self.assertEqual(decrypted_result, LARGE_SECRET)
 
     @mock.patch("boto3.client")
     def test_decrypt_explicit_all_with_kms(self, mock_client):
@@ -265,7 +310,9 @@ class TestDecrypt(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -289,7 +336,9 @@ class TestDecrypt(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -334,7 +383,9 @@ class TestEncrypt(unittest.TestCase):
             kms_key_id=KMS_KEY_ID,
             data_dir=DATA_DIR,
             env=ENV,
-            ciphertext_ext=EXT)
+            ciphertext_ext=EXT,
+            rsa_key_size=RSA_KEY_SIZE,
+            encrypted_chunk_size=CHUNK_SIZE)
 
     def test_encrypt_with_missing_public_key(self):
         self.assertRaises(
