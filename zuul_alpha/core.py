@@ -3,6 +3,7 @@
 import boto3
 import json
 import logging
+import shutil
 import os
 
 from base64 import b64encode, b64decode
@@ -26,9 +27,13 @@ class Zuul:
             data_dir=defaults.ZUUL_DATA_DIR,
             env=None,
             ciphertext_ext=defaults.DEFAULT_CIPHERTEXT_EXT,
-            encrypted_private_key_file=None):
+            encrypted_private_key_file=None,
+            rsa_key_size=defaults.DEFAULT_RSA_KEY_SIZE,
+            encrypted_chunk_size=defaults.CHUNK_SIZE):
         self.kms_key_id = kms_key_id
         self.ciphertext_ext = ciphertext_ext
+        self.rsa_key_size = rsa_key_size
+        self.encrypted_chunk_size = encrypted_chunk_size
         self.ext_len = len(self.ciphertext_ext)
 
         self.app_environment = self._app_environment()
@@ -144,9 +149,43 @@ class Zuul:
         filename = secret_name + self.ciphertext_ext
         secret_filepath = os.path.join(self.environment_secrets_dir, filename)
 
-        encrypted_secret = self.encryptor.encrypt(secret.encode('utf-8'))
-        with open(secret_filepath, 'w') as f:
-            f.write(b64encode(encrypted_secret))
+        try:
+            encrypted_secret = self.encryptor.encrypt(secret.encode('utf-8'))
+            with open(secret_filepath, 'w') as f:
+                f.write(b64encode(encrypted_secret))
+
+            secret_location = secret_filepath
+        except ValueError:
+            log.info("Secret '%s' is too large, breaking into chunks." % (
+                secret_name))
+            secret_location = self._encrypt_in_chunks(secret_name, secret)
+
+        return secret_location
+
+    def _chunkstring(self, string, length):
+        return (string[0+i:length+i] for i in range(0, len(string), length))
+
+    def _encrypt_in_chunks(self, secret_name, secret):
+        '''Breaks down large secrets into RSA valid chunks.'''
+        secret_dir = os.path.join(
+            self.environment_secrets_dir, secret_name)
+        if os.path.exists(secret_dir):
+            shutil.rmtree(secret_dir)
+
+        os.makedirs(secret_dir)
+
+        chunk_num = 0
+        for chunk in self._chunkstring(secret, self.encrypted_chunk_size):
+            secret_filepath = os.path.join(
+                secret_dir, str(chunk_num).zfill(3) + self.ciphertext_ext)
+
+            encrypted_secret = self.encryptor.encrypt(chunk.encode('utf-8'))
+            with open(secret_filepath, 'w') as f:
+                f.write(b64encode(encrypted_secret))
+
+            chunk_num += 1
+
+        return secret_dir
 
     def _encrypt_all_secrets(self, secrets_json):
         '''Helper function to encrypt all secrets from a JSON string'''
@@ -159,35 +198,59 @@ class Zuul:
             log.info(secret_name)
             self._encrypt(secret_name, secret)
 
+    def _decrypt_chunks(self, secret_dir):
+        '''Decrypts a folder full of chunks of a single secret.'''
+        secret = ''
+        secret_files = sorted(os.listdir(secret_dir))
+
+        for file in secret_files:
+            if file.endswith(self.ciphertext_ext):
+                secret += self._decrypt_file(os.path.join(secret_dir, file))
+
+        return secret
+
         # TODO: how to fail with a secret decrypt error?
     def _decrypt_file(self, secret_file):
-        '''Decrypt a single secret by file path.'''
+        '''Decrypt a single ciphertext file by file path.'''
+        plaintext = ''
+
         try:
             with open(secret_file) as f:
-                output = self.decryptor.decrypt(b64decode(f.read()))
+                plaintext = self.decryptor.decrypt(b64decode(f.read()))
         except IOError:
             log.error("No secret found for %s, returning ''" % (
                 os.path.basename(self._chomp_secret_ext(secret_file))))
-            output = None
-        return output
 
-    def _decrypt_secret(self, secret_name):
+        return plaintext
+
+    def _decrypt_secret(self, file, found=False):
         '''Decrypt a single secret by name and return the value as a string.'''
-        filename = secret_name + self.ciphertext_ext
-        secret_file = (os.path.join(self.environment_secrets_dir, filename))
-        return self._decrypt_file(secret_file)
+        secret = ''
+        filepath = os.path.join(self.environment_secrets_dir, file)
+
+        if not found:
+            if os.path.exists(filepath):
+                pass
+            elif os.path.exists(filepath + self.ciphertext_ext):
+                filepath = filepath + self.ciphertext_ext
+            else:
+                return secret
+
+        if os.path.isdir(filepath):
+            secret = self._decrypt_chunks(filepath)
+        else:
+            secret = self._decrypt_file(filepath)
+
+        return secret
 
     def _decrypt_all_secrets(self):
         '''Decrypt all secrets for a particular environment and return a
         dict object'''
-        secret_names = []
-        for file in os.listdir(self.environment_secrets_dir):
-            if file.endswith(self.ciphertext_ext):
-                secret_names.append(self._chomp_secret_ext(file))
-
         secrets = {}
-        for name in secret_names:
-            secrets[name] = self._decrypt_secret(name)
+        for file in os.listdir(self.environment_secrets_dir):
+            secret_name = self._chomp_secret_ext(file)
+            secrets[secret_name] = self._decrypt_secret(file, found=True)
+
         return secrets
 
     def _app_environment(self):
@@ -219,7 +282,11 @@ class Zuul:
 
         return True
 
-    def generate_key_pair(self, key_size=defaults.DEFAULT_RSA_KEY_SIZE):
+    def _utf8_len(self, string):
+        '''Returns UTF byte length of string'''
+        return len(string.encode('utf-8'))
+
+    def generate_key_pair(self):
         '''RSA key generation
 
         Sets up a project or application with asymmetric keys used for all Zuul
@@ -227,9 +294,6 @@ class Zuul:
         an exception is raised. If both already exist, no action is taken.
 
         KMS encrypt is needed to encrypt the RSA private key and save it.
-
-        Args:
-            key_size: the RSA key bit size. (Minimum: 2014)
         '''
         public_key_file_exists = os.path.exists(self.public_key_file)
         private_key_file_exists = os.path.exists(
@@ -246,7 +310,7 @@ class Zuul:
                 'private key exists but public key is missing.')
 
         log.info('Generating key pair...')
-        key = RSA.generate(key_size)
+        key = RSA.generate(self.rsa_key_size)
         private_key = key.exportKey()
         public_key = key.publickey().exportKey()
 
@@ -282,7 +346,7 @@ class Zuul:
             public_key: public RSA to encrypt secrets
         '''
         self._set_encryptor(public_key)
-        self._encrypt(secret_name, secret)
+        return self._encrypt(secret_name, secret)
 
     def import_secrets(self, secrets_json, public_key=None):
         '''Secrets JSON enrypter
