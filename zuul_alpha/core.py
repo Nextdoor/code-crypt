@@ -1,6 +1,7 @@
 """Module to encrypt and decrypt app secrets asymmetrically via KMS."""
 
 import boto3
+import io
 import json
 import logging
 import shutil
@@ -9,7 +10,8 @@ import os
 from base64 import b64encode, b64decode
 
 from Cryptodome.PublicKey import RSA
-from Cryptodome.Cipher import PKCS1_OAEP
+from Cryptodome.Random import get_random_bytes
+from Cryptodome.Cipher import AES, PKCS1_OAEP
 
 from zuul_alpha import defaults
 from zuul_alpha import errors
@@ -19,7 +21,7 @@ log = logging.getLogger(__name__)
 
 class Zuul:
     '''Zuul object which handles the setup of RSA based cryptgraphic facilities,
-    secret and key storange and coomucation with KMS.'''
+    secret and key storange and communication with KMS.'''
     def __init__(
             self,
             kms_key_id=None,
@@ -141,13 +143,16 @@ class Zuul:
             log.warn("Secret '%s' contains non-ASCII chars: '%s'" % (
                 secret_name, secret))
 
-    def _encrypt(self, secret_name, secret):
+    def _encrypt(self, secret_name, secret, secret_dir=None):
         '''Encrypt a single secret name and value pair into the data
         directory by environment.'''
         self._validate_secret(secret_name, secret)
 
+        if not secret_dir:
+            secret_dir = self.environment_secrets_dir
+
         filename = secret_name + self.ciphertext_ext
-        secret_filepath = os.path.join(self.environment_secrets_dir, filename)
+        secret_filepath = os.path.join(secret_dir, filename)
 
         try:
             encrypted_secret = self.encryptor.encrypt(secret.encode('utf-8'))
@@ -156,14 +161,44 @@ class Zuul:
 
             secret_location = secret_filepath
         except ValueError:
-            log.info("Secret '%s' is too large, breaking into chunks." % (
+            if secret_name == 'SESSION_KEY':
+                raise errors.ZuulError
+
+            log.info("Secret '%s' is too large for RSA,"
+                " wrapping AES sessions key." % (
                 secret_name))
-            secret_location = self._encrypt_in_chunks(secret_name, secret)
+            secret_location = self._encrypt_with_aes_session_key(secret_name, secret)
 
         return secret_location
 
     def _chunkstring(self, string, length):
+        '''Partitions the string into strings no greater than the provided
+        length and return a list of strings.'''
         return (string[0+i:length+i] for i in range(0, len(string), length))
+
+    def _encrypt_with_aes_session_key(self, secret_name, secret):
+        secret_dir = os.path.join(
+            self.environment_secrets_dir, secret_name)
+        if os.path.exists(secret_dir):
+            shutil.rmtree(secret_dir)
+
+        os.makedirs(secret_dir)
+
+        session_key = get_random_bytes(16)
+        b4_session_key = b64encode(session_key)
+
+        self._encrypt('SESSION_KEY', b64encode(session_key), secret_dir)
+
+        cipher_aes = AES.new(session_key, AES.MODE_EAX)
+        ciphertext = cipher_aes.encrypt(secret.encode('utf-8'))
+
+        ciphertext_bin_file = os.path.join(secret_dir, 'CIPHERTEXT.bin')
+
+        with open(ciphertext_bin_file, 'w') as f:
+            ciphertext_bin = cipher_aes.nonce + ciphertext
+            f.write(b64encode(ciphertext_bin))
+
+        return secret_dir
 
     def _encrypt_in_chunks(self, secret_name, secret):
         '''Breaks down large secrets into RSA valid chunks.'''
@@ -197,6 +232,25 @@ class Zuul:
         for secret_name, secret in secrets.iteritems():
             log.info(secret_name)
             self._encrypt(secret_name, secret)
+
+    def _decrypt_aes_wrapped(self, secret_dir):
+        '''Decrypts a folder full of chunks of a single secret.'''
+        secret = ''
+        ciphertext_bin = os.path.join(secret_dir, 'CIPHERTEXT.bin')
+        session_key_ciphertext = os.path.join(secret_dir, 'SESSION_KEY' + self.ciphertext_ext)
+
+        session_key = b64decode(self._decrypt_file(session_key_ciphertext))
+
+        with open(ciphertext_bin, 'r') as f:
+            ciphertext_bin = b64decode(f.read())
+
+        nonce = ciphertext_bin[:16]
+        ciphertext = ciphertext_bin[16:]
+
+        cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+        secret = cipher_aes.decrypt(ciphertext)
+
+        return secret
 
     def _decrypt_chunks(self, secret_dir):
         '''Decrypts a folder full of chunks of a single secret.'''
@@ -237,7 +291,8 @@ class Zuul:
                 return secret
 
         if os.path.isdir(filepath):
-            secret = self._decrypt_chunks(filepath)
+            #secret = self._decrypt_chunks(filepath)
+            secret = self._decrypt_aes_wrapped(filepath)
         else:
             secret = self._decrypt_file(filepath)
 
@@ -278,6 +333,8 @@ class Zuul:
         try:
             string.decode('ascii')
         except UnicodeEncodeError:
+            return False
+        except UnicodeDecodeError:
             return False
 
         return True
@@ -363,7 +420,6 @@ class Zuul:
         log.info('Encrypting...')
         self._encrypt_all_secrets(secrets_json)
 
-    # TODO test this this mutual exclusion error here
     def decrypt(
             self,
             secret_name=None,
