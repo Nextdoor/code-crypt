@@ -27,12 +27,14 @@ class Zuul:
             aws_region=defaults.AWS_REGION,
             data_dir=defaults.ZUUL_DATA_DIR,
             env=None,
-            ciphertext_ext=defaults.DEFAULT_CIPHERTEXT_EXT,
+            ciphertext_ext=defaults.CIPHERTEXT_EXT,
             encrypted_private_key_file=None,
-            rsa_key_size=defaults.DEFAULT_RSA_KEY_SIZE):
+            rsa_key_size=defaults.RSA_KEY_SIZE,
+            aes_key_size=defaults.AES_KEY_SIZE):
         self.kms_key_id = kms_key_id
         self.ciphertext_ext = ciphertext_ext
         self.rsa_key_size = rsa_key_size
+        self.aes_key_size = aes_key_size
         self.ext_len = len(self.ciphertext_ext)
 
         self.app_environment = self._app_environment()
@@ -177,7 +179,7 @@ class Zuul:
 
         os.makedirs(secret_dir)
 
-        session_key = get_random_bytes(16)
+        session_key = get_random_bytes((self.aes_key_size / 8))
 
         self._encrypt('SESSION_KEY', b64encode(session_key), secret_dir)
 
