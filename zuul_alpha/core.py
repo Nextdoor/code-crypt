@@ -1,7 +1,6 @@
 """Module to encrypt and decrypt app secrets asymmetrically via KMS."""
 
 import boto3
-import io
 import json
 import logging
 import shutil
@@ -30,12 +29,10 @@ class Zuul:
             env=None,
             ciphertext_ext=defaults.DEFAULT_CIPHERTEXT_EXT,
             encrypted_private_key_file=None,
-            rsa_key_size=defaults.DEFAULT_RSA_KEY_SIZE,
-            encrypted_chunk_size=defaults.CHUNK_SIZE):
+            rsa_key_size=defaults.DEFAULT_RSA_KEY_SIZE):
         self.kms_key_id = kms_key_id
         self.ciphertext_ext = ciphertext_ext
         self.rsa_key_size = rsa_key_size
-        self.encrypted_chunk_size = encrypted_chunk_size
         self.ext_len = len(self.ciphertext_ext)
 
         self.app_environment = self._app_environment()
@@ -164,17 +161,13 @@ class Zuul:
             if secret_name == 'SESSION_KEY':
                 raise errors.ZuulError
 
-            log.info("Secret '%s' is too large for RSA,"
-                " wrapping AES sessions key." % (
+            log.info("Secret '%s' is too large for RSA, wrapping in AES" % (
                 secret_name))
-            secret_location = self._encrypt_with_aes_session_key(secret_name, secret)
+
+            secret_location = self._encrypt_with_aes_session_key(
+                secret_name, secret)
 
         return secret_location
-
-    def _chunkstring(self, string, length):
-        '''Partitions the string into strings no greater than the provided
-        length and return a list of strings.'''
-        return (string[0+i:length+i] for i in range(0, len(string), length))
 
     def _encrypt_with_aes_session_key(self, secret_name, secret):
         secret_dir = os.path.join(
@@ -185,7 +178,6 @@ class Zuul:
         os.makedirs(secret_dir)
 
         session_key = get_random_bytes(16)
-        b4_session_key = b64encode(session_key)
 
         self._encrypt('SESSION_KEY', b64encode(session_key), secret_dir)
 
@@ -197,28 +189,6 @@ class Zuul:
         with open(ciphertext_bin_file, 'w') as f:
             ciphertext_bin = cipher_aes.nonce + ciphertext
             f.write(b64encode(ciphertext_bin))
-
-        return secret_dir
-
-    def _encrypt_in_chunks(self, secret_name, secret):
-        '''Breaks down large secrets into RSA valid chunks.'''
-        secret_dir = os.path.join(
-            self.environment_secrets_dir, secret_name)
-        if os.path.exists(secret_dir):
-            shutil.rmtree(secret_dir)
-
-        os.makedirs(secret_dir)
-
-        chunk_num = 0
-        for chunk in self._chunkstring(secret, self.encrypted_chunk_size):
-            secret_filepath = os.path.join(
-                secret_dir, str(chunk_num).zfill(3) + self.ciphertext_ext)
-
-            encrypted_secret = self.encryptor.encrypt(chunk.encode('utf-8'))
-            with open(secret_filepath, 'w') as f:
-                f.write(b64encode(encrypted_secret))
-
-            chunk_num += 1
 
         return secret_dir
 
@@ -237,7 +207,8 @@ class Zuul:
         '''Decrypts a folder full of chunks of a single secret.'''
         secret = ''
         ciphertext_bin = os.path.join(secret_dir, 'CIPHERTEXT.bin')
-        session_key_ciphertext = os.path.join(secret_dir, 'SESSION_KEY' + self.ciphertext_ext)
+        session_key_ciphertext = os.path.join(
+            secret_dir, 'SESSION_KEY' + self.ciphertext_ext)
 
         session_key = b64decode(self._decrypt_file(session_key_ciphertext))
 
@@ -249,17 +220,6 @@ class Zuul:
 
         cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
         secret = cipher_aes.decrypt(ciphertext)
-
-        return secret
-
-    def _decrypt_chunks(self, secret_dir):
-        '''Decrypts a folder full of chunks of a single secret.'''
-        secret = ''
-        secret_files = sorted(os.listdir(secret_dir))
-
-        for file in secret_files:
-            if file.endswith(self.ciphertext_ext):
-                secret += self._decrypt_file(os.path.join(secret_dir, file))
 
         return secret
 
@@ -291,7 +251,6 @@ class Zuul:
                 return secret
 
         if os.path.isdir(filepath):
-            #secret = self._decrypt_chunks(filepath)
             secret = self._decrypt_aes_wrapped(filepath)
         else:
             secret = self._decrypt_file(filepath)

@@ -94,8 +94,7 @@ class TestGenerateKeyPair(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
         self.expected_public_key_file = os.path.join(
             DATA_DIR, 'keys', ENV, 'public_key.asc')
@@ -130,8 +129,7 @@ class TestGenerateKeyPair(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
         self.zuul.kms.encrypt.return_value = {
                 'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -174,8 +172,7 @@ class TestImportSecrets(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
     def test_import_secrets_with_invalid_secrets_json(self):
         self.assertRaises(
@@ -218,8 +215,7 @@ class TestDecrypt(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
     def test_decrypt_with_missing_private_key_file(self):
         self.assertRaises(errors.InputError, lambda: self.zuul.decrypt('FOO'))
@@ -262,8 +258,7 @@ class TestDecrypt(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -285,8 +280,7 @@ class TestDecrypt(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -311,8 +305,7 @@ class TestDecrypt(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -337,8 +330,7 @@ class TestDecrypt(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -384,8 +376,7 @@ class TestEncrypt(unittest.TestCase):
             data_dir=DATA_DIR,
             env=ENV,
             ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE,
-            encrypted_chunk_size=CHUNK_SIZE)
+            rsa_key_size=RSA_KEY_SIZE)
 
     def test_encrypt_with_missing_public_key(self):
         self.assertRaises(
