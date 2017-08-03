@@ -16,10 +16,6 @@ from zuul_alpha import errors
 
 log = logging.getLogger(__name__)
 
-AES_SESSION_KEY = '_session_key'
-AES_CIPHERTEXT_BIN = '_ciphertext.bin'
-
-
 class Zuul:
     '''Zuul object which handles the setup of RSA based cryptgraphic facilities,
     secret and key storange and communication with KMS.'''
