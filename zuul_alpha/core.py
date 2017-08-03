@@ -16,6 +16,7 @@ from zuul_alpha import errors
 
 log = logging.getLogger(__name__)
 
+
 class Zuul:
     '''Zuul object which handles the setup of RSA based cryptgraphic facilities,
     secret and key storange and communication with KMS.'''
