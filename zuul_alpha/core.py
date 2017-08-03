@@ -3,7 +3,6 @@
 import boto3
 import json
 import logging
-import shutil
 import os
 
 from base64 import b64encode, b64decode
@@ -16,6 +15,9 @@ from zuul_alpha import defaults
 from zuul_alpha import errors
 
 log = logging.getLogger(__name__)
+
+AES_SESSION_KEY = '_session_key'
+AES_CIPHERTEXT_BIN = '_ciphertext.bin'
 
 
 class Zuul:
@@ -124,6 +126,8 @@ class Zuul:
 
         try:
             private_key_obj = RSA.import_key(plaintext_private_key)
+
+            self.rsa_size_in_bytes = private_key_obj.size_in_bytes()
             self.decryptor = PKCS1_OAEP.new(private_key_obj)
         except Exception as e:
             raise errors.DecryptorError(
@@ -142,57 +146,42 @@ class Zuul:
             log.warn("Secret '%s' contains non-ASCII chars: '%s'" % (
                 secret_name, secret))
 
-    def _encrypt(self, secret_name, secret, secret_dir=None):
+    def _encrypt(self, secret_name, secret):
         '''Encrypt a single secret name and value pair into the data
         directory by environment.'''
         self._validate_secret(secret_name, secret)
+        secret = secret.encode('utf-8')
 
-        if not secret_dir:
-            secret_dir = self.environment_secrets_dir
+        pkcs1_pad = 42
 
-        filename = secret_name + self.ciphertext_ext
-        secret_filepath = os.path.join(secret_dir, filename)
-
-        try:
-            encrypted_secret = self.encryptor.encrypt(secret.encode('utf-8'))
-            with open(secret_filepath, 'w') as f:
-                f.write(b64encode(encrypted_secret))
-
-            secret_location = secret_filepath
-        except ValueError:
-            if secret_name == 'SESSION_KEY':
-                raise errors.ZuulError
-
+        # when secret is smaller than RSA max payload size
+        if (len(secret) < ((self.rsa_key_size / 8) - pkcs1_pad)):
+            ext = self.ciphertext_ext
+            encrypted_secret = self.encryptor.encrypt(secret)
+        else:
             log.info("Secret '%s' is too large for RSA, wrapping in AES" % (
                 secret_name))
-
-            secret_location = self._encrypt_with_aes_session_key(
+            ext = '.bin'
+            encrypted_secret = self._encrypt_with_aes_session_key(
                 secret_name, secret)
 
-        return secret_location
+        filename = secret_name + ext
+        secret_filepath = os.path.join(self.environment_secrets_dir, filename)
+
+        with open(secret_filepath, 'w') as f:
+            f.write(b64encode(encrypted_secret))
 
     def _encrypt_with_aes_session_key(self, secret_name, secret):
-        secret_dir = os.path.join(
-            self.environment_secrets_dir, secret_name)
-        if os.path.exists(secret_dir):
-            shutil.rmtree(secret_dir)
-
-        os.makedirs(secret_dir)
-
         session_key = get_random_bytes((self.aes_key_size / 8))
-
-        self._encrypt('SESSION_KEY', b64encode(session_key), secret_dir)
+        encrypted_session_key = self.encryptor.encrypt(session_key)
 
         cipher_aes = AES.new(session_key, AES.MODE_EAX)
-        ciphertext = cipher_aes.encrypt(secret.encode('utf-8'))
+        ciphertext = cipher_aes.encrypt(secret)
 
-        ciphertext_bin_file = os.path.join(secret_dir, 'CIPHERTEXT.bin')
+        ciphertext_bin = (
+            encrypted_session_key + cipher_aes.nonce + ciphertext)
 
-        with open(ciphertext_bin_file, 'w') as f:
-            ciphertext_bin = cipher_aes.nonce + ciphertext
-            f.write(b64encode(ciphertext_bin))
-
-        return secret_dir
+        return ciphertext_bin
 
     def _encrypt_all_secrets(self, secrets_json):
         '''Helper function to encrypt all secrets from a JSON string'''
@@ -205,57 +194,54 @@ class Zuul:
             log.info(secret_name)
             self._encrypt(secret_name, secret)
 
-    def _decrypt_aes_wrapped(self, secret_dir):
-        '''Decrypts a folder full of chunks of a single secret.'''
-        secret = ''
-        ciphertext_bin = os.path.join(secret_dir, 'CIPHERTEXT.bin')
-        session_key_ciphertext = os.path.join(
-            secret_dir, 'SESSION_KEY' + self.ciphertext_ext)
-
-        session_key = b64decode(self._decrypt_file(session_key_ciphertext))
-
-        with open(ciphertext_bin, 'r') as f:
-            ciphertext_bin = b64decode(f.read())
-
-        nonce = ciphertext_bin[:16]
-        ciphertext = ciphertext_bin[16:]
-
-        cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
-        secret = cipher_aes.decrypt(ciphertext)
+    def _decrypt_file(self, secret_file):
+        try:
+            with open(secret_file) as f:
+                    secret = self.decryptor.decrypt(b64decode(f.read()))
+        except Exception as e:
+            log.error(
+                "Could not decrypt secret '%s', returning '' (Reason: %s)" % (
+                    os.path.basename(secret_file), e.message))
+            secret = ''
 
         return secret
 
-        # TODO: how to fail with a secret decrypt error?
-    def _decrypt_file(self, secret_file):
-        '''Decrypt a single ciphertext file by file path.'''
-        plaintext = ''
-
+    def _decrypt_aes_wrapped_file(self, secret_file):
         try:
-            with open(secret_file) as f:
-                plaintext = self.decryptor.decrypt(b64decode(f.read()))
-        except IOError:
-            log.error("No secret found for %s, returning ''" % (
-                os.path.basename(self._chomp_secret_ext(secret_file))))
+            with open(secret_file, 'r') as f:
+                ciphertext_bin = b64decode(f.read())
 
-        return plaintext
+            # break out bin file
+            offset = self.rsa_size_in_bytes
+            encrypted_session_key = ciphertext_bin[:offset]
+            nonce = ciphertext_bin[offset:offset + 16]
+            ciphertext = ciphertext_bin[offset + 16:]
 
-    def _decrypt_secret(self, file, found=False):
+            # decrypt aes session key with rsa private key
+            session_key = self.decryptor.decrypt(encrypted_session_key)
+            cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+
+            secret = cipher_aes.decrypt(ciphertext)
+        except Exception as e:
+            log.error(
+                "Could not decrypt AES wrapped secret '%s',"
+                " returning '' (Reason: %s)" % (
+                    os.path.basename(secret_file), e.message))
+            secret = ''
+
+        return secret
+
+    def _decrypt_secret(self, secret_name):
         '''Decrypt a single secret by name and return the value as a string.'''
         secret = ''
-        filepath = os.path.join(self.environment_secrets_dir, file)
 
-        if not found:
-            if os.path.exists(filepath):
-                pass
-            elif os.path.exists(filepath + self.ciphertext_ext):
-                filepath = filepath + self.ciphertext_ext
-            else:
-                return secret
-
-        if os.path.isdir(filepath):
-            secret = self._decrypt_aes_wrapped(filepath)
-        else:
-            secret = self._decrypt_file(filepath)
+        if secret_name in self.secrets_dict:
+            secret_path = self.secrets_dict[secret_name]
+            if os.path.basename(secret_path).endswith(defaults.CIPHERTEXT_EXT):
+                secret = self._decrypt_file(secret_path)
+            elif os.path.basename(secret_path).endswith('.bin'):
+                secret = self._decrypt_aes_wrapped_file(
+                    secret_path)
 
         return secret
 
@@ -263,11 +249,22 @@ class Zuul:
         '''Decrypt all secrets for a particular environment and return a
         dict object'''
         secrets = {}
-        for file in os.listdir(self.environment_secrets_dir):
-            secret_name = self._chomp_secret_ext(file)
-            secrets[secret_name] = self._decrypt_secret(file, found=True)
+
+        for secret_name, secret_path in self.secrets_dict.iteritems():
+            secrets[secret_name] = self._decrypt_secret(secret_name)
 
         return secrets
+
+    def _get_secrets_dict(self):
+        secrets_dict = {}
+
+        for file in os.listdir(self.environment_secrets_dir):
+            if file.endswith(defaults.CIPHERTEXT_EXT) or file.endswith('.bin'):
+                secret_name = self._chomp_ext(file)
+                secrets_dict[secret_name] = os.path.join(
+                    self.environment_secrets_dir, file)
+
+        return secrets_dict
 
     def _app_environment(self):
         '''Derive and a return the application environment based on the
@@ -283,12 +280,9 @@ class Zuul:
 
         return defaults.DEFAULT_ENV
 
-    def _chomp_secret_ext(self, string):
-        '''Remove the extension of a filename based on the global ciphertext
-        extension.'''
-        if string.endswith(self.ciphertext_ext):
-            string = string[:-self.ext_len]
-        return string
+    def _chomp_ext(self, string):
+        '''Remove the extension of a filename.'''
+        return os.path.splitext(string)[0]
 
     def _is_ascii(self, string):
         try:
@@ -364,7 +358,10 @@ class Zuul:
             public_key: public RSA to encrypt secrets
         '''
         self._set_encryptor(public_key)
-        return self._encrypt(secret_name, secret)
+        self.secrets_dict = self._get_secrets_dict()
+
+        log.info('Encrypting...')
+        self._encrypt(secret_name, secret)
 
     def import_secrets(self, secrets_json, public_key=None):
         '''Secrets JSON enrypter
@@ -378,7 +375,9 @@ class Zuul:
             public_key: public RSA to encrypt secrets
         '''
         self._set_encryptor(public_key)
-        log.info('Encrypting...')
+        self._get_secrets_dict()
+
+        log.info('Importing...')
         self._encrypt_all_secrets(secrets_json)
 
     def decrypt(
@@ -413,6 +412,8 @@ class Zuul:
         self._set_decryptor(
             plaintext_private_key=plaintext_private_key,
             encrypted_private_key=encrypted_private_key)
+        self.secrets_dict = self._get_secrets_dict()
+
         log.info('Decrypting...')
         if secret_name:
             return self._decrypt_secret(secret_name)

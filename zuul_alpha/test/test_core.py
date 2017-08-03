@@ -226,14 +226,16 @@ class TestDecrypt(unittest.TestCase):
             lambda: self.zuul.decrypt('FOO', 'bar'))
 
     def test_decrypt_with_missing_secret(self):
-        decrypted_result = self.zuul.decrypt('FOO', TEST_PLAINTEXT_PRIVATE_KEY)
+        decrypted_result = self.zuul.decrypt(
+            'FOO', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEquals(decrypted_result, '')
 
     def test_decrypt_secret_with_plaintext_private_key(self):
         self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_CCC', 'CCC')
 
         decrypted_result = self.zuul.decrypt(
-            'SECRET_NAME_CCC', TEST_PLAINTEXT_PRIVATE_KEY)
+            'SECRET_NAME_CCC',
+            plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEqual(decrypted_result, 'CCC')
 
     def test_decrypt_secret_with_invalid_kms_context(self):
