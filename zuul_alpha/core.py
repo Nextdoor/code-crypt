@@ -199,7 +199,7 @@ class Zuul:
             log.error(
                 "Could not decrypt secret '%s', returning '' (Reason: %s)" % (
                     os.path.basename(secret_file), e.message))
-            secret = ''
+            secret = None
 
         return secret
 
@@ -224,13 +224,13 @@ class Zuul:
                 "Could not decrypt AES wrapped secret '%s',"
                 " returning '' (Reason: %s)" % (
                     os.path.basename(secret_file), e.message))
-            secret = ''
+            secret = None
 
         return secret
 
     def _decrypt_secret(self, secret_name):
         '''Decrypt a single secret by name and return the value as a string.'''
-        secret = ''
+        secret = None
 
         if secret_name in self.secrets_dict:
             secret_path = self.secrets_dict[secret_name]
@@ -248,7 +248,9 @@ class Zuul:
         secrets = {}
 
         for secret_name, secret_path in self.secrets_dict.iteritems():
-            secrets[secret_name] = self._decrypt_secret(secret_name)
+            secret = self._decrypt_secret(secret_name)
+            if secret is not None:
+                secrets[secret_name] = secret
 
         return secrets
 

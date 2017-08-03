@@ -228,7 +228,7 @@ class TestDecrypt(unittest.TestCase):
     def test_decrypt_with_missing_secret(self):
         decrypted_result = self.zuul.decrypt(
             'FOO', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
-        self.assertEquals(decrypted_result, '')
+        self.assertIsNone(decrypted_result)
 
     def test_decrypt_secret_with_plaintext_private_key(self):
         self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_CCC', 'CCC')
@@ -248,6 +248,10 @@ class TestDecrypt(unittest.TestCase):
         self.assertRaises(
             errors.InputError,
             lambda: self.zuul.decrypt('FOO'))
+
+    def test_decrypt_all_with_no_secrets(self):
+        decrypted_result = self.zuul.decrypt(plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
+        self.assertEquals(decrypted_result, {})
 
     @mock.patch("boto3.client")
     def test_decrypt_secret_with_kms(self, mock_client):
