@@ -14,7 +14,8 @@ from cryptography.hazmat.primitives import serialization
 from zuul_alpha import core as zuul_alpha
 from zuul_alpha import errors
 
-DATA_DIR = tempfile.mkdtemp()
+APP_ROOT = tempfile.mkdtemp()
+DATA_DIR = 'zuul_data'
 ENV = 'test'
 EXT = '.enc'
 KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -117,15 +118,15 @@ class TestGenerateKeyPair(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
         self.expected_public_key_file = os.path.join(
-            DATA_DIR, 'keys', ENV, 'public_key.asc')
+            APP_ROOT, DATA_DIR, 'keys', ENV, 'public_key.asc')
 
         self.expected_private_key_file = os.path.join(
-            DATA_DIR, 'keys', ENV, 'encrypted_private_key.pem')
+            APP_ROOT, DATA_DIR, 'keys', ENV, 'encrypted_private_key.pem')
 
     def test_generate_key_pair_with_missing_private_key(self):
         with open(self.expected_public_key_file, 'w') as f:
@@ -151,7 +152,7 @@ class TestGenerateKeyPair(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -174,14 +175,14 @@ class TestGenerateKeyPair(unittest.TestCase):
         #     exit(1)
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 class TestImportSecrets(unittest.TestCase):
 
     def _decrypt_helper(self, private_key, secret_name):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
 
         private_key_obj = serialization.load_pem_private_key(
                 private_key,
@@ -198,7 +199,7 @@ class TestImportSecrets(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -220,14 +221,14 @@ class TestImportSecrets(unittest.TestCase):
         self.assertEqual(decrypted_result, 'BBB')
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 class TestDecrypt(unittest.TestCase):
 
     def _encrypt_helper(self, public_key, secret_name, secret):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
 
         public_key_obj = serialization.load_pem_public_key(
                 public_key,
@@ -244,7 +245,7 @@ class TestDecrypt(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -292,7 +293,7 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -313,7 +314,7 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -337,7 +338,7 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -361,7 +362,7 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -376,14 +377,14 @@ class TestDecrypt(unittest.TestCase):
         self.assertEqual(decrypted_result['SECRET_NAME_2'], secret_two)
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 class TestEncrypt(unittest.TestCase):
 
     def _decrypt_helper(self, private_key, secret_name):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
 
         private_key_obj = serialization.load_pem_private_key(
                 private_key,
@@ -399,7 +400,7 @@ class TestEncrypt(unittest.TestCase):
 
     def _encrypt_helper(self, public_key, secret_name, secret):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
 
         public_key_obj = serialization.load_pem_public_key(
                 public_key,
@@ -416,7 +417,7 @@ class TestEncrypt(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
@@ -471,7 +472,7 @@ class TestEncrypt(unittest.TestCase):
         self.assertEquals(decrypted_result, new_secret)
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 if __name__ == '__main__':

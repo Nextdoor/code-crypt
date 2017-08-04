@@ -49,7 +49,7 @@ class Zuul:
             self,
             kms_key_id=None,
             aws_region=defaults.AWS_REGION,
-            data_dir=defaults.ZUUL_DATA_DIR,
+            app_root=defaults.APP_ROOT,
             env=None,
             ciphertext_ext=defaults.CIPHERTEXT_EXT,
             encrypted_private_key_file=None,
@@ -63,6 +63,7 @@ class Zuul:
         if env:
             self.app_environment = env
 
+        data_dir = os.path.join(app_root, defaults.DATA_DIR)
         self._init_dirs(data_dir)
 
         self.encrypted_private_key_file = os.path.join(
@@ -185,8 +186,8 @@ class Zuul:
 
         # warn when secret value contains non-ascii chars
         if not self._is_ascii(secret):
-            log.warn("Secret '%s' contains non-ASCII chars: '%s'" % (
-                secret_name, secret))
+            log.warn("Secret '%s' contains non-ASCII chars." % (
+                secret_name))
 
     def _encrypt(self, secret_name, secret):
         '''Encrypt a single secret name and value pair into the data
