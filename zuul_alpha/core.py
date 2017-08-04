@@ -7,6 +7,8 @@ import os
 
 from base64 import b64encode, b64decode
 
+from cryptography.fernet import Fernet
+
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Random import get_random_bytes
 from Cryptodome.Cipher import AES, PKCS1_OAEP
@@ -169,14 +171,13 @@ class Zuul:
             f.write(b64encode(encrypted_secret))
 
     def _encrypt_with_aes_session_key(self, secret_name, secret):
-        session_key = get_random_bytes((self.aes_key_size / 8))
+        session_key = Fernet.generate_key()
         encrypted_session_key = self.encryptor.encrypt(session_key)
 
-        cipher_aes = AES.new(session_key, AES.MODE_EAX)
-        ciphertext = cipher_aes.encrypt(secret)
+        fernet_cipher = Fernet(session_key)
+        ciphertext = fernet_cipher.encrypt(secret)
 
-        ciphertext_bin = (
-            encrypted_session_key + cipher_aes.nonce + ciphertext)
+        ciphertext_bin = encrypted_session_key + ciphertext
 
         return ciphertext_bin
 
@@ -211,14 +212,13 @@ class Zuul:
             # break out bin file
             offset = self.rsa_size_in_bytes
             encrypted_session_key = ciphertext_bin[:offset]
-            nonce = ciphertext_bin[offset:offset + 16]
-            ciphertext = ciphertext_bin[offset + 16:]
+            ciphertext = ciphertext_bin[offset:]
 
             # decrypt aes session key with rsa private key
             session_key = self.decryptor.decrypt(encrypted_session_key)
-            cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+            fernet_cipher = Fernet(session_key)
 
-            secret = cipher_aes.decrypt(ciphertext)
+            secret = fernet_cipher.decrypt(ciphertext)
         except Exception as e:
             log.error(
                 "Could not decrypt AES wrapped secret '%s',"
