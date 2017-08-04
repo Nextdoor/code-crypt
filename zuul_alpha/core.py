@@ -18,6 +18,30 @@ from zuul_alpha import errors
 log = logging.getLogger(__name__)
 
 
+class Decryptor:
+        '''Helper class which creates a decryptor object with default
+        padding.'''
+        def __init__(self, private_key_obj, padding=defaults.RSA_PADDING):
+            self.private_key_obj = private_key_obj
+            self.padding = padding
+
+        def decrypt(self, data):
+            plaintext = self.private_key_obj.decrypt(data, self.padding)
+            return plaintext
+
+
+class Encryptor:
+    '''Helper class which creates a encryptor object with default
+    padding.'''
+    def __init__(self, public_key_obj, padding=defaults.RSA_PADDING):
+        self.public_key_obj = public_key_obj
+        self.padding = padding
+
+    def encrypt(self, data):
+        ciphertext = self.public_key_obj.encrypt(data, self.padding)
+        return ciphertext
+
+
 class Zuul:
     '''Zuul object which handles the setup of RSA and AES cryptgraphic
     facilities, secret and key storange and communication with KMS.'''
@@ -84,17 +108,6 @@ class Zuul:
 
         return response[u'Plaintext']
 
-    class Encryptor:
-        '''Helper class which creates a encryptor object with default
-        padding.'''
-        def __init__(self, public_key_obj, padding=defaults.RSA_PADDING):
-            self.public_key_obj = public_key_obj
-            self.padding = padding
-
-        def encrypt(self, data):
-            ciphertext = self.public_key_obj.encrypt(data, self.padding)
-            return ciphertext
-
     def _set_encryptor(self, public_key):
         '''Creates a OAEP decryptor based on a RSA private key.'''
         if not public_key:
@@ -110,7 +123,7 @@ class Zuul:
                 public_key,
                 backend=default_backend())
 
-            self.encryptor = self.Encryptor(public_key_obj)
+            self.encryptor = Encryptor(public_key_obj)
         except Exception as e:
             raise errors.EncryptorError(
                 "public key is malformed. (Reason: %s)" % (e.message))
@@ -152,7 +165,7 @@ class Zuul:
                 backend=default_backend())
 
             self.rsa_size_in_bytes = (defaults.RSA_KEY_SIZE / 8)
-            self.decryptor = self.Decryptor(private_key_obj)
+            self.decryptor = Decryptor(private_key_obj)
         except Exception as e:
             raise errors.DecryptorError(
                 "private key is malformed. (Reason: %s)" % (e.message))
@@ -181,10 +194,9 @@ class Zuul:
         self._validate_secret(secret_name, secret)
         secret = secret.encode('utf-8')
 
-        OAEP_pad = 42
-
         # when secret is smaller than RSA max payload size
-        if (len(secret) < ((self.rsa_key_size / 8) - OAEP_pad)):
+        # (RSA ciphertext length minus OAEP padding length in bytes)
+        if (len(secret) < ((self.rsa_key_size / 8) - 42)):
             ext = self.ciphertext_ext
             encrypted_secret = self.encryptor.encrypt(secret)
         else:

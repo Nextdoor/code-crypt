@@ -188,7 +188,7 @@ class TestImportSecrets(unittest.TestCase):
                 password=None,
                 backend=default_backend())
 
-        decryptor = self.zuul.Decryptor(private_key_obj)
+        decryptor = zuul_alpha.Decryptor(private_key_obj)
 
         with open(secret_file) as f:
             plaintext_secret = decryptor.decrypt(b64decode(f.read()))
@@ -233,7 +233,7 @@ class TestDecrypt(unittest.TestCase):
                 public_key,
                 backend=default_backend())
 
-        encryptor = self.zuul.Encryptor(public_key_obj)
+        encryptor = zuul_alpha.Encryptor(public_key_obj)
         encrypted_secret = encryptor.encrypt(secret.encode('utf-8'))
 
         with open(secret_file, 'w') as f:
@@ -390,7 +390,7 @@ class TestEncrypt(unittest.TestCase):
                 password=None,
                 backend=default_backend())
 
-        decryptor = self.zuul.Decryptor(private_key_obj)
+        decryptor = zuul_alpha.Decryptor(private_key_obj)
 
         with open(secret_file) as f:
             plaintext_secret = decryptor.decrypt(b64decode(f.read()))
@@ -405,7 +405,7 @@ class TestEncrypt(unittest.TestCase):
                 public_key,
                 backend=default_backend())
 
-        encryptor = self.zuul.Encryptor(public_key_obj)
+        encryptor = zuul_alpha.Encryptor(public_key_obj)
         encrypted_secret = encryptor.encrypt(secret.encode('utf-8'))
 
         with open(secret_file, 'w') as f:
