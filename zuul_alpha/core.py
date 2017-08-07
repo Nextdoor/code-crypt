@@ -234,8 +234,15 @@ class Zuul:
             with open(secret_file, 'r') as f:
                 ciphertext_bin = b64decode(f.read())
 
-            # break out bin file
+            # Break out bin file
+            # (RSA ciphertext length == RSA key size in bytes)
             offset = (self.rsa_key_size / 8)
+            if offset > len(ciphertext_bin):
+                raise errors.InputError(
+                    "RSA ciphertext length for secret '%s' is larger than the "
+                    "secret ciphertext binary length" % (
+                        os.path.basename(secret_file)))
+
             encrypted_session_key = ciphertext_bin[:offset]
             ciphertext = ciphertext_bin[offset:]
 
