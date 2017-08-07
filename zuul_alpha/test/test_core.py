@@ -8,18 +8,16 @@ import unittest
 
 from base64 import b64decode, b64encode
 
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Cipher import PKCS1_OAEP
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
 from zuul_alpha import core as zuul_alpha
 from zuul_alpha import errors
 
-
-DATA_DIR = tempfile.mkdtemp()
+APP_ROOT = tempfile.mkdtemp()
+DATA_DIR = 'zuul_data'
 ENV = 'test'
 EXT = '.enc'
-RSA_KEY_SIZE = 1024
-CHUNK_SIZE = 86
 KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
 TEST_VALID_JSON = """{
@@ -27,48 +25,77 @@ TEST_VALID_JSON = """{
   "SECRET_NAME_B": "BBB"
 }"""
 
-TEST_PUBLIC_KEY = """-----BEGIN RSA PUBLIC KEY-----
-MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCHka7JNmKajUcRdCDPXZZ44pRe
-neKMZFPP+rSEU4Gt2hUz0gXeSJIFGd9aTiEN2cfYKSaNQSSgbH+PKY12PRnSWzMU
-bULV4zITOjq/FjsWIhyCFM60vt3Sj6jYYPYrcTcKq+9aJkA9eCiVQ61jxiUttDSi
-WjXYXmxPxX23dg1h6QIDAQAB
------END RSA PUBLIC KEY-----"""
+TEST_PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoarMXPlutxvhuBLeCAhX
+rYcmjMbQlxzJCiF8dPcTeTBrNxK8ZZCwwgB++zCqLnoiK3+SPqhp09berzNtZVAi
+UGPoE65qBwL/zwjbiXfA/QiUN8rercJHWSbT5uNLWQrNJOabC/OASPvjM2VUjGl/
+1DquzjPjHxqo2hSSRfbygovm4DHutDQVkuJ5nPIwBtZZ3t/RJW4wbfyCtXJFcOdE
+L/UYdbRbgCLEbQ9K1pD0yQ4PRMeuWl8BqwDJSip+wTU0kBRlHEdnMeMLPx4C/4rg
+TOj1XyNOXMyhzYHs99BmZRxsE5jAa2eUKVEltxZnEp9K/IqewXbT4RCfICZE8WPM
+bwIDAQAB
+-----END PUBLIC KEY-----"""
 
 TEST_PLAINTEXT_PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
-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
+MIIEpQIBAAKCAQEAoarMXPlutxvhuBLeCAhXrYcmjMbQlxzJCiF8dPcTeTBrNxK8
+ZZCwwgB++zCqLnoiK3+SPqhp09berzNtZVAiUGPoE65qBwL/zwjbiXfA/QiUN8re
+rcJHWSbT5uNLWQrNJOabC/OASPvjM2VUjGl/1DquzjPjHxqo2hSSRfbygovm4DHu
+tDQVkuJ5nPIwBtZZ3t/RJW4wbfyCtXJFcOdEL/UYdbRbgCLEbQ9K1pD0yQ4PRMeu
+Wl8BqwDJSip+wTU0kBRlHEdnMeMLPx4C/4rgTOj1XyNOXMyhzYHs99BmZRxsE5jA
+a2eUKVEltxZnEp9K/IqewXbT4RCfICZE8WPMbwIDAQABAoIBAFB/MvK4YCBcia+V
+9Wgaf02wFcnS1NnpQ1EAC3BR9ihJq5jog1YvDVQL2y5HtPUfaxQtmSwJv2fzfT3P
+ZZEkrXFJzay/E5waKjV0O5vfPQDA3MxK/0WVjuEdLDWyxzm23x6YlGsG+8Fbam2U
+7txbS4LpFVEnFNfP9nNf+tVLeMT3CX54e2D1+rXG1egnw2uH0uzbui12l1kE+G+l
+MojHLbTXSrYBZf5yPvdJiEWP9iX/J4HIWO9LBk9hdYLLGkzbNwLTQrXHZgWN2NWP
+0PTU35AhX0yWLH/dEFwCEowiue+eGx3Qq9VwrHAaqbkE8xk961HbjNqjVvyptMm5
+BCGVXkECgYEA0JH2zFehVF9/dYQrJ/uW166m/CmO+oSue5iilq0ESPufhcKo7zPo
+x2gR+jcsB25DhVra/HLKcFQUcUVPk6M+V4CKc5LW08Zf3SxUSXejYhR9LZXaPJ2J
+pV2cMUJxmNtCxRxtj/urbBEF24JphLe85KRSUYHUucSqrFtvz2ilQgsCgYEAxm5Z
+TrjSDRyHo6RP8l2gjGGwFZ4qG95p0brcV9uYv1y2eo7MsaY5IUhz/5sf7J4XcJ0r
+byFaB/AflKzMITeG/nbzRmGB7kIfd1nT508/oxWU5Jv9/9AhyLbMM3gzQyIbV0qs
+VlvN90LaToHhkhk6mvCMaTDyG95Cij7MkVEQYa0CgYEA0BvUlbAaWYWwOCHYrdxr
+dmneVF1jPLSHJOv3z0Bzth7b3SuORJ8W9WDyDyhd1kw/MyCkwKAJPmumuh7eeAG6
+grTPcOJjWIvnu1gwAd5ON98ZyBJt322Rml79KmmRz2N4DBWBfNkxAnM51P0bLEHp
+SHptaMaS64lAgxn5Roqz2mECgYEAiClymQVUBfE81jrLLUm4AHyMItlslcESJfuu
+dY9XioCpKwJQTdr9OuyHxK8CwhBdj0YaZuCg8e+BDDlivaxnsreXCgWg7ghrpS97
+rC8CQPtvN0wfiGmetSdSikMCEiAWWNkB1ySZ+gDi4ppXWjR7tZQ5FXmjuSHT0R90
+qobQ0eUCgYEAoMhv5SsaFyk53pjXuqllX4tOiq2FAC8iUfnmGoXOAgOMb/Y0DxZo
+39Ok73YeQSa3Aaa4ibfPJv+/keTEVuvkMIhCxOhOI6YT992B1VQQbeovlf6YwPNC
+RnzPabvLpiSymUdlOMiTOBG1IEioY48rYt/JRzwywcZJ24dm3FE5/cM=
 -----END RSA PRIVATE KEY-----"""
 
-TEST_ENCRYPTED_PRIVATE_KEY = """AQICAHhiG23RsuSTqwlDgwSBWuBR8vtuEXp93gSa1U3HT2B
-6gwELXt1bQkxxr5geTtATUksrAAAD3jCCA9oGCSqGSIb3DQEHBqCCA8swggPHAgEAMIIDwAYJKoZIhv
-cNAQcBMB4GCWCGSAFlAwQBLjARBAxKOUPOFAuu6+hrSswCARCAggOR3DXvk7k8dBKQSYxo9J97lmvsl
-vBe8ycD4Bqz732AvITsht20sphKBNb+4CghVN9EVafSRwDtC7KPZy3OGW//w4rN+2o2jNhwx6XeV4T/
-H4C8V5/CsErzBDOSx/VgcVzWUi9VWU2LWb0gyWdUouPvHAoimbhzJ3F4EIZK0Y3AmeZ0aWqt1xNgsqI
-Su+5fdan06Rl5bQ30TNAAH9MU3v/+7WXudfjvwl/iklPW8JJKVYdGjcfHniNhoc3x1mdpV5QgcuT7AK
-ngc6dIkAWFMKyJFDu8IvVr5yrqhzrT8uCsOITemjwcLkpkvZqEWC7a0zbI9CKC6s51UB4fa+GMFEXvZ
-XO3t6DUzqi2Q+mIFfpNp3ftYmgiHFZYM1N0uDHJ/i4aLB7qImukPhwFK+/KCKCCHhvZKEIJtcYe/JBV
-h4feJlqZHozH5s3RkECpjy8n7BIEgSXZiaKxoponnbUX0cU8CQ4RlYqAbMV8hQLNlawlDocThdHLMi7
-JDWX0QulJaDa1kWrecL49ZLj0w3pf6FDLmcl00eGnBgrwzorCyrAHCm+ImEvne+ZCYHr/LoLBDo068G
-jANphSwmy+kqRwOwiYfJeCTTP29/61MoNCi1M8pfO1lsm5281CfKUYtWqaUJ1OzOxyNjK1j8sLmauDN
-Cc11UTLIGLjOP54kDshTnPNCWQXP4LBx1/zxq30qBB+wT78ve+dLhl606KruOzYkR6YScdnZXmeWYa8
-ZJYFkeQupsr+sD5a8mdLFOJIwF5S1OrvafGEPpHpcsDO8FEbTSNPVT5MYJq/t5fSvdnF7pKPXgdqtY+
-51VczuV1aZ2gpmatQvpHYA2ym0ony4Or7LkCpTBLFA6stoa7TkCV23O3UXa43k7rZoJEsXEBtcYygPX
-i+cwSea5xsiQyunMH83Kd1T6i7WYbIpD/uR1DlVq72XIuuXfzibzLAOwi7Wro5P2n/a4vG2SJ53oQwB
-8Hie/uQup7npkyyCuCCaCvOgQ6cPCEmyHyE2bh8Ot3Btt5Gap4kBAqa8NpR2e9lamews0x7slYd1+60
-CPnruX3rsO07qAmw9oI4wnbw9vNaZXBXSnIBqEH4pQbAmvIAgSW8TPB4rLgqG6ggkn1DQD7GB3kMOWs
-Kdc1LG8Q/7xcAxpbYQADhxiyjMycHeFLkksDK/y9Yv4j5MK6aFrHYls41/ATklPH/wqjRZfcsS/ZeTU
-lDNU8tcQ=="""
+TEST_ENCRYPTED_PRIVATE_KEY = """AQICAHhiG23RsuSTqwlDgwSBWuBR8vtuEXp93gSa1U3HT2
+B6gwFXBr/FJsoxfaluFn9dEQaXAAAG9zCCBvMGCSqGSIb3DQEHBqCCBuQwggbgAgEAMIIG2QYJKoZI
+hvcNAQcBMB4GCWCGSAFlAwQBLjARBAwRxVHAc1aReGMBLLUCARCAggaqcBmtFSHgQYH8xRJCnkcNyc
+5HAtYG0jz+yA/DUKyWNaaPzqdx2+sFYVttHEjv/P5i01DwYuzn5AT7dSi73cTvXn0znShV+GsGC7WQ
+ZfEwziGS6Liyod4Gyn5flS/Ttgypc+2kmDOyOAABXr+3/Kmo6zE1FJkXOsYF6UuN9wGUFLtm7Ygerk
+Hd0asVHKEfv398etOgwwxrzqe0mJXH5EZpn1g5x6DPgLvrTApednt+wtcpT+HgV8onFhAj5BQyZ9h6
+i0P15Y49S1VrpMFfS9t3DdpWgFgt/Dyf3Cc7eiXZYca4o9eC7Mf+HALDM2wxpICOOrkACq6YYPFgL3
+7ocUVjEs35xijz+UsG5abrVqn
+v6XtpJYXpOhZstmfwQAK8VpCFH6gjnSxeZNmG6sNYb16Qdfs1frMq1nXlYxPKfe+yzjooMPGfP3Kv5
+ManSSO1MP9tWBIRJoBzRFn1zQhUrpqvQ+rYux4PGZwAloxsiGDfOMbJGUZSpT+WguPTNGGH2srvLo1
+fNvCMD/sC3HqqeKBdFzAvzsNJkUTVo0IZ8fmmrRf62SoNd+QFw2nqLeZS9MocIhp1qa/yah9zj9Pep
+1epK3/pNdq7I0PZ9X8WFoDIm+71nUXmgQoLa5Dcmej5d2ugbi2Ope/RRj5lXGprl+L087LzBCpHbZh
+0nKdVdwF2xiKmtQZWjcSsGAiB8aRXrOieH7fLfQfsJ+aASzCyViOK8cajypFFZQbgGi11zMqCTEiK4
+CI4iqyfjYrL71W1bbHXuTB07JsMjlcyU/aefbm59gDOKi0kNg45qzz7zC5NWoAaoFWF79QU81LCgnN
+n9ziIwpEv5P8YkOuziUyikpHGGo7vt67I7Rguz/tr0FHI8K9JoZBx/MsJ4N/PqT1OaE0VEEL3TbMRa
+zAYouivOVSnqdvNFzntrMoMLnCqRhVnCP9NEihhkCIaQUO50LVm+N0zaP76eWrPVVlsHVKR8GjuhQ7
+lS8FyFPkQT1NBdKzO69ISKQ5MZ2l0MEeyLHKj1BzLrgkYW2ms/ZIUj+yXU7Y6M392oXM1YGfyWregF
+2zKL/gbRXqQg3Uk9DtmOsGv5PoLxpG6Us2YfHgUeDqr5qsgnMqzGj0EaFalE43rD1HbRCCWSSq0P+x
+9XlJPCKei1PPDGsGkXwiBDiJuexK8ji/K5z5nmgQeE/GTIhFka/2EiUnNLJ1vOCWcH7Xq9ka6nV6EN
+0EEpvxZ7Ch7F0mYXW1D79zLTcvzPjMtvIH2O7gXFQL13wlRnTt5wKT63eEscSZjXGa6ajEnPQcXuCz
+Xr1LSsCuxzYp2UXMJppilxMmI07Erw28ybJa3I5QTCHjHXAYPGFjwm2nh6bAI/TRLQwamgSsdXBhw2
+XJ+TWSj9Rsn7VCtavjW3u6KKFBINjSA+P7udJq93y5YDMD8mvOmsql0l8V6HyhxLKK4HYOOXz/Fz84
+IZoifgvZLmgRRW0oofBZ1zCs0ERxtwypMq4kIGwErr8YGJ/fykWu15YIR/kYb/9ObyXrw80fJtGB5b
+hv1T5KHSV7TJiQAqQplepsHkjTQNC6/yzGjhxWsRSGcNXLxYHH6Mnhzdzxl24FjLUCi6Q4Nhp0HfW+
+QT178iwrc5arogEYWZI0oDFGHIwfLhUNjrzB6Udu0xN6mHLoshyZuqrAYjGmVZVkOmjZprLghuGprk
+oKU5RzKMI6GwkBO6py7w6OkRrSqMeO3qpz6U/rbnhtSATBKaVicGpIUbM5efdbKZ8bIkct3t/WHjNr
+35j7kLuLk2jBESIGCfd/lberJaoJfn8gprlxmsc/ppADbT/mAr03NygPKAuuNZVZaiHYhgTi0uHbGp
+573L9RPQqrJBs1NPZTVOiXVp1+iX0zoqvDg3hUOFZSTTVXVFhZVJ3jLI1XY3CagrnX6n542xjfUrE4
+6/PxDAbwc8D+jmRv5H/snLrBXTbRPTGR7XY61UGLDy850dFwqYMkf5bPu3rzicopu5fE2VBOEOLGCo
+g/okmP7DNeqCvHHBV84aoNzQfap94iChtHB9s3vhGnSelQSb5bC9KV8cZE3q9FTc/NkeWwbF2TlMUi
++hdl5RAs67eEJ8TpckK5xds5nN4XwFYh+hm/5Z9KqpWx4u3mR+LTk0W1zhfd9GBc+Zt9O9Lfb8p45g
+CMJ0pdKGEMy/44aY1Y2cq7AXC5SPH+ie+iAzs/keOvBbjbniJK4Uf+PMQJq0KMjzLyw0KXYS6RzinW
+n91rMuBMWam1FHtcPdLeXFw1NX68NtUfiB48keI1tBgo="""
 
 # Sample RSA Private Key
 LARGE_SECRET = """-----BEGIN RSA PRIVATE KEY-----
@@ -91,16 +118,15 @@ class TestGenerateKeyPair(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
         self.expected_public_key_file = os.path.join(
-            DATA_DIR, 'keys', ENV, 'public_key.asc')
+            APP_ROOT, DATA_DIR, 'keys', ENV, 'public_key.asc')
 
         self.expected_private_key_file = os.path.join(
-            DATA_DIR, 'keys', ENV, 'encrypted_private_key.pem')
+            APP_ROOT, DATA_DIR, 'keys', ENV, 'encrypted_private_key.pem')
 
     def test_generate_key_pair_with_missing_private_key(self):
         with open(self.expected_public_key_file, 'w') as f:
@@ -126,10 +152,9 @@ class TestGenerateKeyPair(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
         self.zuul.kms.encrypt.return_value = {
                 'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -150,16 +175,21 @@ class TestGenerateKeyPair(unittest.TestCase):
         #     exit(1)
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 class TestImportSecrets(unittest.TestCase):
 
     def _decrypt_helper(self, private_key, secret_name):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
 
-        decryptor = PKCS1_OAEP.new(RSA.import_key(private_key))
+        private_key_obj = serialization.load_pem_private_key(
+                private_key,
+                password=None,
+                backend=default_backend())
+
+        decryptor = zuul_alpha.Decryptor(private_key_obj)
 
         with open(secret_file) as f:
             plaintext_secret = decryptor.decrypt(b64decode(f.read()))
@@ -169,10 +199,9 @@ class TestImportSecrets(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
     def test_import_secrets_with_invalid_secrets_json(self):
         self.assertRaises(
@@ -192,16 +221,20 @@ class TestImportSecrets(unittest.TestCase):
         self.assertEqual(decrypted_result, 'BBB')
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 class TestDecrypt(unittest.TestCase):
 
     def _encrypt_helper(self, public_key, secret_name, secret):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
 
-        encryptor = PKCS1_OAEP.new(RSA.import_key(public_key))
+        public_key_obj = serialization.load_pem_public_key(
+                public_key,
+                backend=default_backend())
+
+        encryptor = zuul_alpha.Encryptor(public_key_obj)
         encrypted_secret = encryptor.encrypt(secret.encode('utf-8'))
 
         with open(secret_file, 'w') as f:
@@ -212,10 +245,9 @@ class TestDecrypt(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
     def test_decrypt_with_missing_private_key_file(self):
         self.assertRaises(errors.InputError, lambda: self.zuul.decrypt('FOO'))
@@ -261,10 +293,9 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -283,10 +314,9 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -308,10 +338,9 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -333,10 +362,9 @@ class TestDecrypt(unittest.TestCase):
 
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
         self.zuul.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
@@ -349,15 +377,21 @@ class TestDecrypt(unittest.TestCase):
         self.assertEqual(decrypted_result['SECRET_NAME_2'], secret_two)
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 class TestEncrypt(unittest.TestCase):
 
     def _decrypt_helper(self, private_key, secret_name):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
-        decryptor = PKCS1_OAEP.new(RSA.import_key(private_key))
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
+
+        private_key_obj = serialization.load_pem_private_key(
+                private_key,
+                password=None,
+                backend=default_backend())
+
+        decryptor = zuul_alpha.Decryptor(private_key_obj)
 
         with open(secret_file) as f:
             plaintext_secret = decryptor.decrypt(b64decode(f.read()))
@@ -366,9 +400,13 @@ class TestEncrypt(unittest.TestCase):
 
     def _encrypt_helper(self, public_key, secret_name, secret):
         secret_file = os.path.join(
-            DATA_DIR, 'secrets', ENV, secret_name + EXT)
+            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
 
-        encryptor = PKCS1_OAEP.new(RSA.import_key(public_key))
+        public_key_obj = serialization.load_pem_public_key(
+                public_key,
+                backend=default_backend())
+
+        encryptor = zuul_alpha.Encryptor(public_key_obj)
         encrypted_secret = encryptor.encrypt(secret.encode('utf-8'))
 
         with open(secret_file, 'w') as f:
@@ -379,10 +417,9 @@ class TestEncrypt(unittest.TestCase):
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
-            data_dir=DATA_DIR,
+            app_root=APP_ROOT,
             env=ENV,
-            ciphertext_ext=EXT,
-            rsa_key_size=RSA_KEY_SIZE)
+            ciphertext_ext=EXT)
 
     def test_encrypt_with_missing_public_key(self):
         self.assertRaises(
@@ -435,7 +472,7 @@ class TestEncrypt(unittest.TestCase):
         self.assertEquals(decrypted_result, new_secret)
 
     def tearDown(self):
-        shutil.rmtree(DATA_DIR)
+        shutil.rmtree(APP_ROOT)
 
 
 if __name__ == '__main__':

@@ -7,9 +7,10 @@ import os
 
 from base64 import b64encode, b64decode
 
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Random import get_random_bytes
-from Cryptodome.Cipher import AES, PKCS1_OAEP
+from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from zuul_alpha import defaults
 from zuul_alpha import errors
@@ -17,29 +18,52 @@ from zuul_alpha import errors
 log = logging.getLogger(__name__)
 
 
+class Decryptor:
+        '''Helper class which creates a decryptor object with default
+        padding.'''
+        def __init__(self, private_key_obj, padding=defaults.RSA_PADDING):
+            self.private_key_obj = private_key_obj
+            self.padding = padding
+
+        def decrypt(self, data):
+            plaintext = self.private_key_obj.decrypt(data, self.padding)
+            return plaintext
+
+
+class Encryptor:
+    '''Helper class which creates a encryptor object with default
+    padding.'''
+    def __init__(self, public_key_obj, padding=defaults.RSA_PADDING):
+        self.public_key_obj = public_key_obj
+        self.padding = padding
+
+    def encrypt(self, data):
+        ciphertext = self.public_key_obj.encrypt(data, self.padding)
+        return ciphertext
+
+
 class Zuul:
-    '''Zuul object which handles the setup of RSA based cryptgraphic facilities,
-    secret and key storange and communication with KMS.'''
+    '''Zuul object which handles the setup of RSA and AES cryptgraphic
+    facilities, secret and key storange and communication with KMS.'''
     def __init__(
             self,
             kms_key_id=None,
             aws_region=defaults.AWS_REGION,
-            data_dir=defaults.ZUUL_DATA_DIR,
+            app_root=defaults.APP_ROOT,
             env=None,
             ciphertext_ext=defaults.CIPHERTEXT_EXT,
             encrypted_private_key_file=None,
-            rsa_key_size=defaults.RSA_KEY_SIZE,
-            aes_key_size=defaults.AES_KEY_SIZE):
+            rsa_key_size=defaults.RSA_KEY_SIZE):
         self.kms_key_id = kms_key_id
         self.ciphertext_ext = ciphertext_ext
         self.rsa_key_size = rsa_key_size
-        self.aes_key_size = aes_key_size
         self.ext_len = len(self.ciphertext_ext)
 
         self.app_environment = self._app_environment()
         if env:
             self.app_environment = env
 
+        data_dir = os.path.join(app_root, defaults.DATA_DIR)
         self._init_dirs(data_dir)
 
         self.encrypted_private_key_file = os.path.join(
@@ -72,8 +96,8 @@ class Zuul:
 
     def _get_plaintext_private_key(
             self, ciphertext_blob, encryption_context={}):
-        '''Return a plaintext private key by performing a KMS decrypt on the
-        stored encrypted private key'''
+        '''Return a plaintext RSA private key by performing a KMS decrypt on
+        the stored encrypted private key'''
         try:
             response = self.kms.decrypt(
                 CiphertextBlob=b64decode(ciphertext_blob),
@@ -86,7 +110,7 @@ class Zuul:
         return response[u'Plaintext']
 
     def _set_encryptor(self, public_key):
-        '''Creates a PKCS1_OAEP encryptor based on a RSA public s key.'''
+        '''Creates a OAEP decryptor based on a RSA private key.'''
         if not public_key:
             try:
                 with open(self.public_key_file, 'r') as f:
@@ -96,17 +120,31 @@ class Zuul:
                     "public key '%s' does not exist." % self.public_key_file)
 
         try:
-            public_key_obj = RSA.import_key(public_key).publickey()
-            self.encryptor = PKCS1_OAEP.new(public_key_obj)
+            public_key_obj = serialization.load_pem_public_key(
+                public_key,
+                backend=default_backend())
+
+            self.encryptor = Encryptor(public_key_obj)
         except Exception as e:
             raise errors.EncryptorError(
                 "public key is malformed. (Reason: %s)" % (e.message))
+
+    class Decryptor:
+        '''Helper class which creates a decryptor object with default
+        padding.'''
+        def __init__(self, private_key_obj, padding=defaults.RSA_PADDING):
+            self.private_key_obj = private_key_obj
+            self.padding = padding
+
+        def decrypt(self, data):
+            plaintext = self.private_key_obj.decrypt(data, self.padding)
+            return plaintext
 
     def _set_decryptor(
             self,
             plaintext_private_key=None,
             encrypted_private_key=None):
-        '''Creates a PKCS1_OAEP decryptor based on a RSA private key.'''
+        '''Creates a OAEP decryptor based on a RSA private key.'''
         if not plaintext_private_key:
             if not encrypted_private_key:
                 try:
@@ -122,26 +160,34 @@ class Zuul:
                 encryption_context=self.encryption_context)
 
         try:
-            private_key_obj = RSA.import_key(plaintext_private_key)
+            private_key_obj = serialization.load_pem_private_key(
+                plaintext_private_key,
+                password=None,
+                backend=default_backend())
 
-            self.rsa_size_in_bytes = private_key_obj.size_in_bytes()
-            self.decryptor = PKCS1_OAEP.new(private_key_obj)
+            self.rsa_size_in_bytes = (defaults.RSA_KEY_SIZE / 8)
+            self.decryptor = Decryptor(private_key_obj)
         except Exception as e:
             raise errors.DecryptorError(
                 "private key is malformed. (Reason: %s)" % (e.message))
 
     def _validate_secret(self, secret_name, secret):
+        # secret must have a value
         if len(secret_name) == 0:
             raise errors.InputError(
                 "secret name '%s' must be greather than length of 0" % (
                     secret_name))
+
+        # secret name can only contain ascii characters
         if not self._is_ascii(secret_name):
             raise errors.InputError(
                 "secret name '%s' must contain only ASCII chars" % (
                     secret_name))
+
+        # warn when secret value contains non-ascii chars
         if not self._is_ascii(secret):
-            log.warn("Secret '%s' contains non-ASCII chars: '%s'" % (
-                secret_name, secret))
+            log.warn("Secret '%s' contains non-ASCII chars." % (
+                secret_name))
 
     def _encrypt(self, secret_name, secret):
         '''Encrypt a single secret name and value pair into the data
@@ -149,10 +195,9 @@ class Zuul:
         self._validate_secret(secret_name, secret)
         secret = secret.encode('utf-8')
 
-        pkcs1_pad = 42
-
         # when secret is smaller than RSA max payload size
-        if (len(secret) < ((self.rsa_key_size / 8) - pkcs1_pad)):
+        # (RSA ciphertext length minus OAEP padding length in bytes)
+        if (len(secret) < ((self.rsa_key_size / 8) - 42)):
             ext = self.ciphertext_ext
             encrypted_secret = self.encryptor.encrypt(secret)
         else:
@@ -169,14 +214,16 @@ class Zuul:
             f.write(b64encode(encrypted_secret))
 
     def _encrypt_with_aes_session_key(self, secret_name, secret):
-        session_key = get_random_bytes((self.aes_key_size / 8))
+        '''Creates a AES-CBC 128 bit session key and to encrypt large secrets
+        with and packages that session key (encrypted with the RSA public key)
+        along with the ciphertext as a binary.'''
+        session_key = Fernet.generate_key()
         encrypted_session_key = self.encryptor.encrypt(session_key)
 
-        cipher_aes = AES.new(session_key, AES.MODE_EAX)
-        ciphertext = cipher_aes.encrypt(secret)
+        fernet_cipher = Fernet(session_key)
+        ciphertext = fernet_cipher.encrypt(secret)
 
-        ciphertext_bin = (
-            encrypted_session_key + cipher_aes.nonce + ciphertext)
+        ciphertext_bin = encrypted_session_key + ciphertext
 
         return ciphertext_bin
 
@@ -192,6 +239,7 @@ class Zuul:
             self._encrypt(secret_name, secret)
 
     def _decrypt_file(self, secret_file):
+        '''Decrypts a RSA encrypted file.'''
         try:
             with open(secret_file) as f:
                     secret = self.decryptor.decrypt(b64decode(f.read()))
@@ -204,6 +252,8 @@ class Zuul:
         return secret
 
     def _decrypt_aes_wrapped_file(self, secret_file):
+        '''Decrypts a binary which contains an RSA encrypted AES session key
+        and AES encrypted data.'''
         try:
             with open(secret_file, 'r') as f:
                 ciphertext_bin = b64decode(f.read())
@@ -211,14 +261,13 @@ class Zuul:
             # break out bin file
             offset = self.rsa_size_in_bytes
             encrypted_session_key = ciphertext_bin[:offset]
-            nonce = ciphertext_bin[offset:offset + 16]
-            ciphertext = ciphertext_bin[offset + 16:]
+            ciphertext = ciphertext_bin[offset:]
 
             # decrypt aes session key with rsa private key
             session_key = self.decryptor.decrypt(encrypted_session_key)
-            cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+            fernet_cipher = Fernet(session_key)
 
-            secret = cipher_aes.decrypt(ciphertext)
+            secret = fernet_cipher.decrypt(ciphertext)
         except Exception as e:
             log.error(
                 "Could not decrypt AES wrapped secret '%s',"
@@ -243,7 +292,7 @@ class Zuul:
         return secret
 
     def _decrypt_all_secrets(self):
-        '''Decrypt all secrets for a particular environment and return a
+        '''Decrypt all secrets for the current environment and return a
         dict object'''
         secrets = {}
 
@@ -255,6 +304,11 @@ class Zuul:
         return secrets
 
     def _get_secrets_dict(self):
+        '''Returns a dict of all secrets available for the current environment.
+
+        key: secret_name
+        value: absolute path of the secret file
+        '''
         secrets_dict = {}
 
         for file in os.listdir(self.environment_secrets_dir):
@@ -321,14 +375,24 @@ class Zuul:
                 'private key exists but public key is missing.')
 
         log.info('Generating key pair...')
-        key = RSA.generate(self.rsa_key_size)
-        private_key = key.exportKey()
-        public_key = key.publickey().exportKey()
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=self.rsa_key_size,
+            backend=default_backend())
+        private_key_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption())
+
+        public_key = private_key.public_key()
+        public_key_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo)
 
         try:
             response = self.kms.encrypt(
                 KeyId=self.kms_key_id,
-                Plaintext=private_key,
+                Plaintext=private_key_pem,
                 EncryptionContext=self.encryption_context)
         except Exception as e:
             raise errors.KmsError(
@@ -341,13 +405,15 @@ class Zuul:
             f.write(b64encode(ciphertext_blob))
 
         with open(self.public_key_file, 'w') as f:
-            f.write(public_key)
+            f.write(public_key_pem)
 
     def encrypt(self, secret_name, secret, public_key=None):
         '''Single secret encryptor
 
         Takes in a single key-value pair secret and encrypts it with the RSA
-        public key.
+        public key, UNLESS, the secret is too large for RSA payload size (214
+        bytes for a 2048-bit key), in which case it is encrypted in AES and
+        the AES session key is wrapped by RSA encryption.
 
         Secret names will be stored as filenames in the data directory.
 
