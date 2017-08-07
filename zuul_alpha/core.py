@@ -195,27 +195,18 @@ class Zuul:
         self._validate_secret(secret_name, secret)
         secret = secret.encode('utf-8')
 
-        # when secret is smaller than RSA max payload size
-        # (RSA ciphertext length minus OAEP padding length in bytes)
-        if (len(secret) < ((self.rsa_key_size / 8) - 42)):
-            ext = self.ciphertext_ext
-            encrypted_secret = self.encryptor.encrypt(secret)
-        else:
-            log.info("Secret '%s' is too large for RSA, wrapping in AES" % (
-                secret_name))
-            ext = '.bin'
-            encrypted_secret = self._encrypt_with_aes_session_key(
-                secret_name, secret)
+        encrypted_secret = self._encrypt_with_aes_session_key(
+            secret_name, secret)
 
-        filename = secret_name + ext
+        filename = secret_name + self.ciphertext_ext
         secret_filepath = os.path.join(self.environment_secrets_dir, filename)
 
         with open(secret_filepath, 'w') as f:
             f.write(b64encode(encrypted_secret))
 
     def _encrypt_with_aes_session_key(self, secret_name, secret):
-        '''Creates a AES-CBC 128 bit session key and to encrypt large secrets
-        with and packages that session key (encrypted with the RSA public key)
+        '''Creates a AES-CBC 128 bit session key and to encrypt secrets with
+        and packages that session key (encrypted with the RSA public key)
         along with the ciphertext as a binary.'''
         session_key = Fernet.generate_key()
         encrypted_session_key = self.encryptor.encrypt(session_key)
@@ -238,19 +229,6 @@ class Zuul:
             log.info(secret_name)
             self._encrypt(secret_name, secret)
 
-    def _decrypt_file(self, secret_file):
-        '''Decrypts a RSA encrypted file.'''
-        try:
-            with open(secret_file) as f:
-                    secret = self.decryptor.decrypt(b64decode(f.read()))
-        except Exception as e:
-            log.error(
-                "Could not decrypt secret '%s', returning '' (Reason: %s)" % (
-                    os.path.basename(secret_file), e.message))
-            secret = None
-
-        return secret
-
     def _decrypt_aes_wrapped_file(self, secret_file):
         '''Decrypts a binary which contains an RSA encrypted AES session key
         and AES encrypted data.'''
@@ -270,8 +248,7 @@ class Zuul:
             secret = fernet_cipher.decrypt(ciphertext)
         except Exception as e:
             log.error(
-                "Could not decrypt AES wrapped secret '%s',"
-                " returning '' (Reason: %s)" % (
+                "Could not decrypt AES wrapped secret '%s' (Reason: %s)" % (
                     os.path.basename(secret_file), e.message))
             secret = None
 
@@ -283,11 +260,8 @@ class Zuul:
 
         if secret_name in self.secrets_dict:
             secret_path = self.secrets_dict[secret_name]
-            if os.path.basename(secret_path).endswith(defaults.CIPHERTEXT_EXT):
-                secret = self._decrypt_file(secret_path)
-            elif os.path.basename(secret_path).endswith('.bin'):
-                secret = self._decrypt_aes_wrapped_file(
-                    secret_path)
+            if os.path.basename(secret_path).endswith('.bin'):
+                secret = self._decrypt_aes_wrapped_file(secret_path)
 
         return secret
 
