@@ -6,18 +6,13 @@ import shutil
 import tempfile
 import unittest
 
-from base64 import b64decode, b64encode
-
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-
 from zuul_alpha import core as zuul_alpha
 from zuul_alpha import errors
 
 APP_ROOT = tempfile.mkdtemp()
 DATA_DIR = 'zuul_data'
 ENV = 'test'
-EXT = '.enc'
+EXT = '.bin'
 KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
 TEST_VALID_JSON = """{
@@ -180,22 +175,6 @@ class TestGenerateKeyPair(unittest.TestCase):
 
 class TestImportSecrets(unittest.TestCase):
 
-    def _decrypt_helper(self, private_key, secret_name):
-        secret_file = os.path.join(
-            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
-
-        private_key_obj = serialization.load_pem_private_key(
-                private_key,
-                password=None,
-                backend=default_backend())
-
-        decryptor = zuul_alpha.Decryptor(private_key_obj)
-
-        with open(secret_file) as f:
-            plaintext_secret = decryptor.decrypt(b64decode(f.read()))
-
-        return plaintext_secret
-
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
             kms_key_id=KMS_KEY_ID,
@@ -212,12 +191,12 @@ class TestImportSecrets(unittest.TestCase):
     def test_import_secrets_with_valid_data(self):
         self.zuul.import_secrets(TEST_VALID_JSON, TEST_PUBLIC_KEY)
 
-        decrypted_result = self._decrypt_helper(
-            TEST_PLAINTEXT_PRIVATE_KEY, 'SECRET_NAME_A')
+        decrypted_result = self.zuul.decrypt(
+            'SECRET_NAME_A', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEqual(decrypted_result, 'AAA')
 
-        decrypted_result = self._decrypt_helper(
-            TEST_PLAINTEXT_PRIVATE_KEY, 'SECRET_NAME_B')
+        decrypted_result = self.zuul.decrypt(
+            'SECRET_NAME_B', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEqual(decrypted_result, 'BBB')
 
     def tearDown(self):
@@ -225,22 +204,6 @@ class TestImportSecrets(unittest.TestCase):
 
 
 class TestDecrypt(unittest.TestCase):
-
-    def _encrypt_helper(self, public_key, secret_name, secret):
-        secret_file = os.path.join(
-            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
-
-        public_key_obj = serialization.load_pem_public_key(
-                public_key,
-                backend=default_backend())
-
-        encryptor = zuul_alpha.Encryptor(public_key_obj)
-        encrypted_secret = encryptor.encrypt(secret.encode('utf-8'))
-
-        with open(secret_file, 'w') as f:
-            f.write(b64encode(encrypted_secret))
-
-        return secret_file
 
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
@@ -263,7 +226,7 @@ class TestDecrypt(unittest.TestCase):
         self.assertIsNone(decrypted_result)
 
     def test_decrypt_secret_with_plaintext_private_key(self):
-        self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_CCC', 'CCC')
+        self.zuul.encrypt('SECRET_NAME_CCC', 'CCC', TEST_PUBLIC_KEY)
 
         decrypted_result = self.zuul.decrypt(
             'SECRET_NAME_CCC',
@@ -288,7 +251,7 @@ class TestDecrypt(unittest.TestCase):
     @mock.patch("boto3.client")
     def test_decrypt_secret_with_kms(self, mock_client):
         secret = 'DDD'
-        self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_DDD', secret)
+        self.zuul.encrypt('SECRET_NAME_DDD', secret, TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
 
         self.zuul = zuul_alpha.Zuul(
@@ -332,8 +295,10 @@ class TestDecrypt(unittest.TestCase):
     def test_decrypt_explicit_all_with_kms(self, mock_client):
         secret_one = 'one'
         secret_two = 'two'
-        self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_1', secret_one)
-        self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_2', secret_two)
+        self.zuul.encrypt(
+            'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
+        self.zuul.encrypt(
+            'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
 
         self.zuul = zuul_alpha.Zuul(
@@ -356,8 +321,10 @@ class TestDecrypt(unittest.TestCase):
     def test_decrypt_all_with_kms(self, mock_client):
         secret_one = 'one'
         secret_two = 'two'
-        self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_1', secret_one)
-        self._encrypt_helper(TEST_PUBLIC_KEY, 'SECRET_NAME_2', secret_two)
+        self.zuul.encrypt(
+            'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
+        self.zuul.encrypt(
+            'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
 
         self.zuul = zuul_alpha.Zuul(
@@ -381,38 +348,6 @@ class TestDecrypt(unittest.TestCase):
 
 
 class TestEncrypt(unittest.TestCase):
-
-    def _decrypt_helper(self, private_key, secret_name):
-        secret_file = os.path.join(
-            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
-
-        private_key_obj = serialization.load_pem_private_key(
-                private_key,
-                password=None,
-                backend=default_backend())
-
-        decryptor = zuul_alpha.Decryptor(private_key_obj)
-
-        with open(secret_file) as f:
-            plaintext_secret = decryptor.decrypt(b64decode(f.read()))
-
-        return plaintext_secret
-
-    def _encrypt_helper(self, public_key, secret_name, secret):
-        secret_file = os.path.join(
-            APP_ROOT, DATA_DIR, 'secrets', ENV, secret_name + EXT)
-
-        public_key_obj = serialization.load_pem_public_key(
-                public_key,
-                backend=default_backend())
-
-        encryptor = zuul_alpha.Encryptor(public_key_obj)
-        encrypted_secret = encryptor.encrypt(secret.encode('utf-8'))
-
-        with open(secret_file, 'w') as f:
-            f.write(b64encode(encrypted_secret))
-
-        return secret_file
 
     def setUp(self):
         self.zuul = zuul_alpha.Zuul(
@@ -452,8 +387,8 @@ class TestEncrypt(unittest.TestCase):
         secret = 'AAA'
         self.zuul.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
 
-        decrypted_result = self._decrypt_helper(
-            TEST_PLAINTEXT_PRIVATE_KEY, secret_name)
+        decrypted_result = self.zuul.decrypt(
+            secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
 
         self.assertEquals(decrypted_result, secret)
 
@@ -461,13 +396,12 @@ class TestEncrypt(unittest.TestCase):
         secret_name = 'EXISTING_SECRET'
         secret = 'AAA'
         new_secret = 'BBB'
-        self._encrypt_helper(TEST_PUBLIC_KEY, secret_name, secret)
+        self.zuul.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
 
-        self.zuul.encrypt(
-            secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
+        self.zuul.encrypt(secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
 
-        decrypted_result = self._decrypt_helper(
-            TEST_PLAINTEXT_PRIVATE_KEY, secret_name)
+        decrypted_result = self.zuul.decrypt(
+            secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
 
         self.assertEquals(decrypted_result, new_secret)
 
