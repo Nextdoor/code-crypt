@@ -165,7 +165,6 @@ class Zuul:
                 password=None,
                 backend=default_backend())
 
-            self.rsa_size_in_bytes = (defaults.RSA_KEY_SIZE / 8)
             self.decryptor = Decryptor(private_key_obj)
         except Exception as e:
             raise errors.DecryptorError(
@@ -195,16 +194,15 @@ class Zuul:
         self._validate_secret(secret_name, secret)
         secret = secret.encode('utf-8')
 
-        encrypted_secret = self._encrypt_with_aes_session_key(
-            secret_name, secret)
+        ciphertext_bin = self._encrypt_with_aes_session_key(secret)
 
         filename = secret_name + self.ciphertext_ext
         secret_filepath = os.path.join(self.environment_secrets_dir, filename)
 
         with open(secret_filepath, 'w') as f:
-            f.write(b64encode(encrypted_secret))
+            f.write(b64encode(ciphertext_bin))
 
-    def _encrypt_with_aes_session_key(self, secret_name, secret):
+    def _encrypt_with_aes_session_key(self, secret):
         '''Creates a AES-CBC 128 bit session key and to encrypt secrets with
         and packages that session key (encrypted with the RSA public key)
         along with the ciphertext as a binary.'''
@@ -230,14 +228,14 @@ class Zuul:
             self._encrypt(secret_name, secret)
 
     def _decrypt_aes_wrapped_file(self, secret_file):
-        '''Decrypts a binary which contains an RSA encrypted AES session key
-        and AES encrypted data.'''
+        '''Decrypts a binary file which contains an RSA encrypted AES session
+        key and AES encrypted data.'''
         try:
             with open(secret_file, 'r') as f:
                 ciphertext_bin = b64decode(f.read())
 
             # break out bin file
-            offset = self.rsa_size_in_bytes
+            offset = (self.rsa_key_size / 8)
             encrypted_session_key = ciphertext_bin[:offset]
             ciphertext = ciphertext_bin[offset:]
 
@@ -384,10 +382,10 @@ class Zuul:
     def encrypt(self, secret_name, secret, public_key=None):
         '''Single secret encryptor
 
-        Takes in a single key-value pair secret and encrypts it with the RSA
-        public key, UNLESS, the secret is too large for RSA payload size (214
-        bytes for a 2048-bit key), in which case it is encrypted in AES and
-        the AES session key is wrapped by RSA encryption.
+        Takes in a single key-value pair secret and encrypts it with AES. The
+        AES session key is then encrypted asymmetrically with RSA so that
+        access to this key via KMS will allows decrypts on each individual
+        secret.
 
         Secret names will be stored as filenames in the data directory.
 
@@ -411,7 +409,7 @@ class Zuul:
 
         Args:
             secrets_json: JSON string with secrets to be encrypted
-            public_key: public RSA to encrypt secrets
+            public_key: public RSA to encrypt AES session keys with
         '''
         self._set_encryptor(public_key)
         self._get_secrets_dict()
@@ -438,8 +436,8 @@ class Zuul:
 
         Args:
             secret name: JSON string with secrets to be encrypted
-            plaintext_private_key: private RSA key o decrypt secrets
-            encrypted_private_key: KMS encrypted RSA key o decrypt secrets
+            plaintext_private_key: private RSA key to decrypt AES session keys
+            encrypted_private_key: encrypted version of the the private key
 
         Returns:
             decrypted secrets in dict form
