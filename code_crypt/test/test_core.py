@@ -6,11 +6,11 @@ import shutil
 import tempfile
 import unittest
 
-from zuul_alpha import core as zuul_alpha
-from zuul_alpha import errors
+from code_crypt import core as code_crypt
+from code_crypt import errors
 
 APP_ROOT = tempfile.mkdtemp()
-DATA_DIR = 'zuul_data'
+DATA_DIR = 'code_crypt_data'
 ENV = 'test'
 EXT = '.bin'
 KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -111,7 +111,7 @@ U9VQQSQzY1oZMVX8i1m5WUTLPz2yLJIBQVdXqhMCQBGoiuSoSjafUhV7i1cEGpb88h5NBYZzWXGZ
 class TestGenerateKeyPair(unittest.TestCase):
 
     def setUp(self):
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
@@ -128,16 +128,16 @@ class TestGenerateKeyPair(unittest.TestCase):
             f.write('')
 
         self.assertRaises(
-            errors.ZuulError,
-            lambda: self.zuul.generate_key_pair())
+            errors.CodeCryptError,
+            lambda: self.cc_obj.generate_key_pair())
 
     def test_generate_key_pair_with_missing_public_key_only(self):
         with open(self.expected_private_key_file, 'w') as f:
             f.write('')
 
         self.assertRaises(
-            errors.ZuulError,
-            lambda: self.zuul.generate_key_pair())
+            errors.CodeCryptError,
+            lambda: self.cc_obj.generate_key_pair())
 
     # TODO: mock and test for write out of keys instead of exiting
     @mock.patch("boto3.client")
@@ -145,16 +145,16 @@ class TestGenerateKeyPair(unittest.TestCase):
             self, mock_client):
         mock_client.return_value = mock.MagicMock()
 
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
-        self.zuul.kms.encrypt.return_value = {
+        self.cc_obj.kms.encrypt.return_value = {
                 'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
 
-        self.zuul.generate_key_pair()
+        self.cc_obj.generate_key_pair()
 
         mock_client.assert_called_with('kms', region_name='us-east-1')
 
@@ -176,7 +176,7 @@ class TestGenerateKeyPair(unittest.TestCase):
 class TestImportSecrets(unittest.TestCase):
 
     def setUp(self):
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
@@ -185,17 +185,17 @@ class TestImportSecrets(unittest.TestCase):
     def test_import_secrets_with_invalid_secrets_json(self):
         self.assertRaises(
             errors.InputError,
-            lambda: self.zuul.import_secrets(
+            lambda: self.cc_obj.import_secrets(
                 '{foo=bar}', TEST_PUBLIC_KEY))
 
     def test_import_secrets_with_valid_data(self):
-        self.zuul.import_secrets(TEST_VALID_JSON, TEST_PUBLIC_KEY)
+        self.cc_obj.import_secrets(TEST_VALID_JSON, TEST_PUBLIC_KEY)
 
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             'SECRET_NAME_A', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEqual(decrypted_result, 'AAA')
 
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             'SECRET_NAME_B', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEqual(decrypted_result, 'BBB')
 
@@ -206,29 +206,29 @@ class TestImportSecrets(unittest.TestCase):
 class TestDecrypt(unittest.TestCase):
 
     def setUp(self):
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
     def test_decrypt_with_missing_private_key_file(self):
-        self.assertRaises(errors.InputError, lambda: self.zuul.decrypt('FOO'))
+        self.assertRaises(errors.InputError, lambda: self.cc_obj.decrypt('FOO'))
 
     def test_decrypt_with_malformed_private_key(self):
         self.assertRaises(
             errors.DecryptorError,
-            lambda: self.zuul.decrypt('FOO', 'bar'))
+            lambda: self.cc_obj.decrypt('FOO', 'bar'))
 
     def test_decrypt_with_missing_secret(self):
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             'FOO', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertIsNone(decrypted_result)
 
     def test_decrypt_secret_with_plaintext_private_key(self):
-        self.zuul.encrypt('SECRET_NAME_CCC', 'CCC', TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt('SECRET_NAME_CCC', 'CCC', TEST_PUBLIC_KEY)
 
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             'SECRET_NAME_CCC',
             plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEqual(decrypted_result, 'CCC')
@@ -236,33 +236,33 @@ class TestDecrypt(unittest.TestCase):
     def test_decrypt_secret_with_invalid_kms_context(self):
         self.assertRaises(
             errors.KmsError,
-            lambda: self.zuul.decrypt(
+            lambda: self.cc_obj.decrypt(
                 encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY))
 
     def test_decrypt_secret_with_missing_kms_key(self):
         self.assertRaises(
             errors.InputError,
-            lambda: self.zuul.decrypt('FOO'))
+            lambda: self.cc_obj.decrypt('FOO'))
 
     def test_decrypt_all_with_no_secrets(self):
-        decrypted_result = self.zuul.decrypt(plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
+        decrypted_result = self.cc_obj.decrypt(plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEquals(decrypted_result, {})
 
     @mock.patch("boto3.client")
     def test_decrypt_secret_with_kms(self, mock_client):
         secret = 'DDD'
-        self.zuul.encrypt('SECRET_NAME_DDD', secret, TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt('SECRET_NAME_DDD', secret, TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
 
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
-        self.zuul.kms.decrypt.return_value = {
+        self.cc_obj.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             'SECRET_NAME_DDD',
             encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
 
@@ -272,18 +272,18 @@ class TestDecrypt(unittest.TestCase):
 
     @mock.patch("boto3.client")
     def test_decrypt_large_secret_with_kms(self, mock_client):
-        self.zuul.encrypt('SECRET_NAME_DDD', LARGE_SECRET, TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt('SECRET_NAME_DDD', LARGE_SECRET, TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
 
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
-        self.zuul.kms.decrypt.return_value = {
+        self.cc_obj.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             'SECRET_NAME_DDD',
             encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
 
@@ -295,21 +295,21 @@ class TestDecrypt(unittest.TestCase):
     def test_decrypt_explicit_all_with_kms(self, mock_client):
         secret_one = 'one'
         secret_two = 'two'
-        self.zuul.encrypt(
+        self.cc_obj.encrypt(
             'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
-        self.zuul.encrypt(
+        self.cc_obj.encrypt(
             'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
 
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
-        self.zuul.kms.decrypt.return_value = {
+        self.cc_obj.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
 
         mock_client.assert_called_with('kms', region_name='us-east-1')
@@ -321,21 +321,21 @@ class TestDecrypt(unittest.TestCase):
     def test_decrypt_all_with_kms(self, mock_client):
         secret_one = 'one'
         secret_two = 'two'
-        self.zuul.encrypt(
+        self.cc_obj.encrypt(
             'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
-        self.zuul.encrypt(
+        self.cc_obj.encrypt(
             'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
 
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
             ciphertext_ext=EXT)
 
-        self.zuul.kms.decrypt.return_value = {
+        self.cc_obj.kms.decrypt.return_value = {
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
 
         mock_client.assert_called_with('kms', region_name='us-east-1')
@@ -350,7 +350,7 @@ class TestDecrypt(unittest.TestCase):
 class TestEncrypt(unittest.TestCase):
 
     def setUp(self):
-        self.zuul = zuul_alpha.Zuul(
+        self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
             app_root=APP_ROOT,
             env=ENV,
@@ -359,19 +359,19 @@ class TestEncrypt(unittest.TestCase):
     def test_encrypt_with_missing_public_key(self):
         self.assertRaises(
             errors.InputError,
-            lambda: self.zuul.encrypt('FOO', 'BAR'))
+            lambda: self.cc_obj.encrypt('FOO', 'BAR'))
 
     def test_encrypt_with_malformed_public_key(self):
         self.assertRaises(
             errors.EncryptorError,
-            lambda: self.zuul.encrypt('FOO', 'BAR', 'SOME_BAD_KEY'))
+            lambda: self.cc_obj.encrypt('FOO', 'BAR', 'SOME_BAD_KEY'))
 
     def test_encrypt_with_zero_length_secret_name(self):
         secret_name = ''
         secret = 'AAA'
         self.assertRaises(
             errors.InputError,
-            lambda: self.zuul.encrypt(
+            lambda: self.cc_obj.encrypt(
                 secret_name, secret, public_key=TEST_PUBLIC_KEY))
 
     def test_encrypt_with_non_ascii_secret_name(self):
@@ -379,15 +379,15 @@ class TestEncrypt(unittest.TestCase):
         secret = 'AAA'
         self.assertRaises(
             errors.InputError,
-            lambda: self.zuul.encrypt(
+            lambda: self.cc_obj.encrypt(
                 secret_name, secret, public_key=TEST_PUBLIC_KEY))
 
     def test_encrypt_on_new_secret(self):
         secret_name = 'NEW_SECRET'
         secret = 'AAA'
-        self.zuul.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
 
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
 
         self.assertEquals(decrypted_result, secret)
@@ -396,11 +396,11 @@ class TestEncrypt(unittest.TestCase):
         secret_name = 'EXISTING_SECRET'
         secret = 'AAA'
         new_secret = 'BBB'
-        self.zuul.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
 
-        self.zuul.encrypt(secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt(secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
 
-        decrypted_result = self.zuul.decrypt(
+        decrypted_result = self.cc_obj.decrypt(
             secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
 
         self.assertEquals(decrypted_result, new_secret)

@@ -5,16 +5,16 @@ import json
 import logging
 import sys
 
-from zuul_alpha import core as zuul_alpha
-from zuul_alpha import defaults
-from zuul_alpha import errors
-from zuul_alpha.metadata import __version__
+from code_crypt import core as code_crypt
+from code_crypt import defaults
+from code_crypt import errors
+from code_crypt.metadata import __version__
 
 
 def get_config(argv):
     parser = argparse.ArgumentParser(
         prog=argv[0],
-        description='Zuul Alpha')
+        description='Code Crypt')
 
     parser.add_argument(
         "--kms-key-id",
@@ -78,7 +78,7 @@ def main():
         logging.disable(sys.maxint)
 
     if config.version:
-            print("Zuul Alpha - " + str(__version__))
+            print("Code Crypt - " + str(__version__))
             return
 
     if config.env not in defaults.ENV_TAGS:
@@ -87,20 +87,21 @@ def main():
         exit(1)
     env = config.env
 
-    zuul = zuul_alpha.Zuul(kms_key_id=config.kms_key_id, env=env)
+    code_crypt_obj = code_crypt.CodeCrypt(
+        kms_key_id=config.kms_key_id, env=env)
 
     try:
         if config.init:
-            zuul.generate_key_pair()
+            code_crypt_obj.generate_key_pair()
             return
         if config.decrypt:
-            secret = zuul.decrypt(config.decrypt)
+            secret = code_crypt_obj.decrypt(config.decrypt)
             if secret:
                 print(secret)
                 return
             return
         if config.decrypt_all:
-            secrets = zuul.decrypt()
+            secrets = code_crypt_obj.decrypt()
             print(json.dumps(secrets, indent=2))
             return
         if config.import_secrets:
@@ -111,14 +112,14 @@ def main():
             except IOError as e:
                 raise errors.InputError("secrets file '%s' does not exist" % (
                     secrets_file))
-            zuul.import_secrets(secrets_json)
+            code_crypt_obj.import_secrets(secrets_json)
             return
         if config.encrypt:
             keyval = config.encrypt.split('=')
-            zuul.encrypt(keyval[0], keyval[1])
+            code_crypt_obj.encrypt(keyval[0], keyval[1])
             return
 
-    except errors.ZuulError as e:
+    except errors.CodeCryptError as e:
         print(e.message)
         exit(1)
 

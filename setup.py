@@ -16,9 +16,9 @@ import os
 
 from setuptools import setup, find_packages
 
-from zuul_alpha.metadata import __desc__, __version__
+from code_crypt.metadata import __desc__, __version__
 
-PACKAGE = 'zuul_alpha'
+PACKAGE = 'code_crypt'
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 setup(
@@ -28,7 +28,7 @@ setup(
     long_description=open('%s/README.md' % DIR).read(),
     author='Nextdoor Engineering',
     author_email='nehal@nextdoor.com',
-    url='https://github.com/Nextdoor/zuul_alpha',
+    url='https://github.com/Nextdoor/code-crypt',
     license='Apache License, Version 2.0',
     packages=find_packages(),
     test_suite='nose.collector',
@@ -37,5 +37,5 @@ setup(
     install_requires=open('%s/requirements.txt' % DIR).readlines(),
     entry_points={
         'console_scripts': [
-            'zuul_alpha = zuul_alpha.cli:main']}
+            'code-crypt = code_crypt.cli:main']}
 )

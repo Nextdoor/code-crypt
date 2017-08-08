@@ -1,6 +1,6 @@
 import unittest
 
-from zuul_alpha import cli
+from code_crypt import cli
 
 KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 

@@ -13,5 +13,5 @@
 # Copyright 2017 Nextdoor.com, Inc
 
 
-__version__ = '0.0.2'
-__desc__ = 'Nextdoor Zuul Alpha'
+__version__ = '0.0.3'
+__desc__ = 'Code Crypt'

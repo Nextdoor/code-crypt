@@ -1,3 +1,3 @@
-[![CircleCI](https://circleci.com/gh/Nextdoor/zuul_alpha.svg)](https://circleci.com/gh/Nextdoor/zuul_alpha)
+[![CircleCI](https://circleci.com/gh/Nextdoor/code-crypt.svg)](https://circleci.com/gh/Nextdoor/code-crypt)
 
-# Zuul (Alpha) - Asymmetric KMS secret encryption
+# Code Crypt - Asymmetric KMS Secret Encryption
