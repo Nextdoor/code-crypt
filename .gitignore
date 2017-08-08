@@ -6,11 +6,11 @@ secrets*.json
 .venv
 dist
 build
-zuul_alpha.egg-info
+code_crypt.egg-info
 
-# zuul keys and secrets
-zuul_data
-**/zuul_data
+# code_crypt keys and secrets
+code_crypt_data
+**/code_crypt_data
 
 # temp files
 *.pyc

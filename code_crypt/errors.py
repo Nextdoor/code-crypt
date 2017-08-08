@@ -1,6 +1,6 @@
 
-class ZuulError(Exception):
-    '''Base Exception for Zuul Alpha'''
+class CodeCryptError(Exception):
+    '''Base Exception for Code Crypt'''
     def __init__(self, message=""):
         if message is not "":
             self.message = "%s: %s" % (self.__class__.__name__, message)
@@ -8,21 +8,21 @@ class ZuulError(Exception):
             self.message = self.__class__.__name__
 
 
-class EncryptorError(ZuulError):
+class EncryptorError(CodeCryptError):
     '''Error creating RSA encryptor'''
     pass
 
 
-class DecryptorError(ZuulError):
+class DecryptorError(CodeCryptError):
     '''Error creating RSA decryptor'''
     pass
 
 
-class InputError(ZuulError):
-    '''Error with inputs into the Zuul object'''
+class InputError(CodeCryptError):
+    '''Error with inputs into the CodeCrypt object'''
     pass
 
 
-class KmsError(ZuulError):
+class KmsError(CodeCryptError):
     '''Error with using an AWS KMS operation'''
     pass

@@ -7,7 +7,7 @@ install:
 
 lint:
 	pep8 **/*.py
-	pyflakes zuul_alpha/
+	pyflakes code_crypt/
 
 test:
 	nosetests

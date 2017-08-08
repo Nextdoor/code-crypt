@@ -12,8 +12,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from zuul_alpha import defaults
-from zuul_alpha import errors
+from code_crypt import defaults
+from code_crypt import errors
 
 log = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ class Encryptor:
         return ciphertext
 
 
-class Zuul:
-    '''Zuul object which handles the setup of RSA and AES cryptgraphic
+class CodeCrypt:
+    '''CodeCrypt object which handles the setup of RSA and AES cryptgraphic
     facilities, secret and key storange and communication with KMS.'''
     def __init__(
             self,
@@ -82,8 +82,8 @@ class Zuul:
         self.kms = boto3.client('kms', region_name=aws_region)
 
     def _init_dirs(self, data_dir):
-        '''Sets and create the Zuul data directory which contains secrets and
-        keys based on environment.'''
+        '''Sets and create the Code Crypt data directory which contains secrets
+        and keys based on environment.'''
         self.environment_keys_dir = os.path.join(
             data_dir, 'keys', self.app_environment)
         self.environment_secrets_dir = os.path.join(
@@ -333,8 +333,8 @@ class Zuul:
     def generate_key_pair(self):
         '''RSA key generation
 
-        Sets up a project or application with asymmetric keys used for all Zuul
-        operations. If only one of two of the key pair already exists an
+        Sets up a project or application with asymmetric keys used for all Code
+        Crypt operations. If only one of two of the key pair already exists an
         an exception is raised. If both already exist, no action is taken.
 
         KMS encrypt is needed to encrypt the RSA private key and save it.
@@ -347,10 +347,10 @@ class Zuul:
             log.info('Public key and private key already exist.')
             return
         elif public_key_file_exists and not private_key_file_exists:
-            raise errors.ZuulError(
+            raise errors.CodeCryptError(
                 'public key exists but private key is missing.')
         elif private_key_file_exists and not public_key_file_exists:
-            raise errors.ZuulError(
+            raise errors.CodeCryptError(
                 'private key exists but public key is missing.')
 
         log.info('Generating key pair...')
@@ -450,7 +450,7 @@ class Zuul:
             decrypted secrets in dict form
         '''
         if plaintext_private_key and encrypted_private_key:
-            raise errors.ZuulError(
+            raise errors.CodeCryptError(
                 'both plaintext and encrypted private keys cannot be provided')
 
         self._set_decryptor(
