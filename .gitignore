@@ -3,7 +3,7 @@ secrets*.json
 **/secrets*.json
 
 # dev environment
-.venv
+.venv*
 dist
 build
 code_crypt.egg-info
