@@ -236,6 +236,7 @@ class CodeCrypt:
 
             # Break out bin file
             # (RSA ciphertext length == RSA key size in bytes)
+            # divide by 8 is for bit to byte conversion
             offset = self.rsa_key_size // 8
             if offset > len(ciphertext_bin):
                 raise errors.InputError(

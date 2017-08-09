@@ -9,8 +9,8 @@ build
 code_crypt.egg-info
 
 # code_crypt keys and secrets
-code_crypt_data
-**/code_crypt_data
+code_crypt/data
+**/code_crypt/data
 
 # temp files
 *.pyc
