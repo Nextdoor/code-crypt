@@ -10,7 +10,7 @@ from code_crypt import core as code_crypt
 from code_crypt import errors
 
 APP_ROOT = tempfile.mkdtemp()
-DATA_DIR = u'code_crypt_data'
+DATA_DIR = u'code_crypt/data'
 ENV = u'test'
 EXT = u'.bin'
 KMS_KEY_ID = u'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'

@@ -4,7 +4,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 AWS_REGION = u'us-east-1'
 APP_ROOT = os.getenv(u'APP_ROOT', os.getcwd())
-DATA_DIR = u'code_crypt_data'
+DATA_DIR = u'code_crypt/data'
 DEFAULT_ENV = u'development'
 ENV_TAGS = [DEFAULT_ENV, u'staging', u'production']
 RSA_KEY_SIZE = 2048
