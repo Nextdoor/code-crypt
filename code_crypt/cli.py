@@ -120,7 +120,7 @@ def main():
             return
 
     except errors.CodeCryptError as e:
-        print(e.message)
+        print(str(e))
         exit(1)
 
 if __name__ == '__main__':

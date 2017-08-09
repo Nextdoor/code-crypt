@@ -105,7 +105,7 @@ class CodeCrypt:
         except Exception as e:
             raise errors.KmsError(
                 "Could not encrypt private key using KMS "
-                "key '%s' (Reason: %s)" % (self.kms_key_id, e.message))
+                "key '%s' (Reason: %s)" % (self.kms_key_id, str(e)))
 
         return response[u'Plaintext']
 
@@ -113,7 +113,7 @@ class CodeCrypt:
         '''Creates a OAEP decryptor based on a RSA private key.'''
         if not public_key:
             try:
-                with open(self.public_key_file, 'r') as f:
+                with open(self.public_key_file, 'rb') as f:
                     public_key = f.read()
             except IOError as e:
                 raise errors.InputError(
@@ -127,7 +127,7 @@ class CodeCrypt:
             self.encryptor = Encryptor(public_key_obj)
         except Exception as e:
             raise errors.EncryptorError(
-                "public key is malformed. (Reason: %s)" % (e.message))
+                "public key is malformed. (Reason: %s)" % (str(e)))
 
     class Decryptor:
         '''Helper class which creates a decryptor object with default
@@ -148,7 +148,7 @@ class CodeCrypt:
         if not plaintext_private_key:
             if not encrypted_private_key:
                 try:
-                    with open(self.encrypted_private_key_file, 'r') as f:
+                    with open(self.encrypted_private_key_file, 'rb') as f:
                         encrypted_private_key = f.read()
                 except IOError as e:
                     raise errors.InputError(
@@ -168,7 +168,7 @@ class CodeCrypt:
             self.decryptor = Decryptor(private_key_obj)
         except Exception as e:
             raise errors.DecryptorError(
-                "private key is malformed. (Reason: %s)" % (e.message))
+                "private key is malformed. (Reason: %s)" % (str(e)))
 
     def _validate_secret(self, secret_name, secret):
         # secret must have a value
@@ -199,7 +199,7 @@ class CodeCrypt:
         filename = secret_name + self.ciphertext_ext
         secret_filepath = os.path.join(self.environment_secrets_dir, filename)
 
-        with open(secret_filepath, 'w') as f:
+        with open(secret_filepath, 'wb') as f:
             f.write(b64encode(ciphertext_bin))
 
     def _encrypt_with_aes_session_key(self, secret):
@@ -223,7 +223,7 @@ class CodeCrypt:
         except ValueError:
             raise errors.InputError('input is not valid JSON')
 
-        for secret_name, secret in secrets.iteritems():
+        for secret_name, secret in secrets.items():
             log.info(secret_name)
             self._encrypt(secret_name, secret)
 
@@ -231,12 +231,12 @@ class CodeCrypt:
         '''Decrypts a binary file which contains an RSA encrypted AES session
         key and AES encrypted data.'''
         try:
-            with open(secret_file, 'r') as f:
+            with open(secret_file, 'rb') as f:
                 ciphertext_bin = b64decode(f.read())
 
             # Break out bin file
             # (RSA ciphertext length == RSA key size in bytes)
-            offset = (self.rsa_key_size / 8)
+            offset = int(self.rsa_key_size / 8)
             if offset > len(ciphertext_bin):
                 raise errors.InputError(
                     "RSA ciphertext length for secret '%s' is larger than the "
@@ -250,11 +250,11 @@ class CodeCrypt:
             session_key = self.decryptor.decrypt(encrypted_session_key)
             fernet_cipher = Fernet(session_key)
 
-            secret = fernet_cipher.decrypt(ciphertext)
+            secret = fernet_cipher.decrypt(ciphertext).decode()
         except Exception as e:
             log.error(
                 "Could not decrypt AES wrapped secret '%s' (Reason: %s)" % (
-                    os.path.basename(secret_file), e.message))
+                    os.path.basename(secret_file), str(e)))
             secret = None
 
         return secret
@@ -275,7 +275,7 @@ class CodeCrypt:
         dict object'''
         secrets = {}
 
-        for secret_name, secret_path in self.secrets_dict.iteritems():
+        for secret_name, secret_path in self.secrets_dict.items():
             secret = self._decrypt_secret(secret_name)
             if secret is not None:
                 secrets[secret_name] = secret
@@ -318,17 +318,13 @@ class CodeCrypt:
 
     def _is_ascii(self, string):
         try:
-            string.decode('ascii')
+            string.encode('ascii')
         except UnicodeEncodeError:
             return False
         except UnicodeDecodeError:
             return False
 
         return True
-
-    def _utf8_len(self, string):
-        '''Returns UTF byte length of string'''
-        return len(string.encode('utf-8'))
 
     def generate_key_pair(self):
         '''RSA key generation
@@ -376,14 +372,14 @@ class CodeCrypt:
         except Exception as e:
             raise errors.KmsError(
                 "Could not encrypt private key using KMS "
-                "key '%s' (Reason: %s)" % (self.kms_key_id, e.message))
+                "key '%s' (Reason: %s)" % (self.kms_key_id, str(e)))
 
         ciphertext_blob = response['CiphertextBlob']
 
-        with open(self.encrypted_private_key_file, 'w') as f:
+        with open(self.encrypted_private_key_file, 'wb') as f:
             f.write(b64encode(ciphertext_blob))
 
-        with open(self.public_key_file, 'w') as f:
+        with open(self.public_key_file, 'wb') as f:
             f.write(public_key_pem)
 
     def encrypt(self, secret_name, secret, public_key=None):
