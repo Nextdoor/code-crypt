@@ -59,9 +59,7 @@ class CodeCrypt:
         self.rsa_key_size = rsa_key_size
         self.ext_len = len(self.ciphertext_ext)
 
-        self.app_environment = self._app_environment()
-        if env:
-            self.app_environment = env
+        self._init_env(env)
 
         data_dir = os.path.join(app_root, defaults.DATA_DIR)
         self._init_dirs(data_dir)
@@ -93,6 +91,14 @@ class CodeCrypt:
             os.makedirs(self.environment_secrets_dir)
         if not os.path.exists(self.environment_keys_dir):
             os.makedirs(self.environment_keys_dir)
+
+    def _init_env(self, env):
+        self.app_environment = self._app_environment()
+
+        if env:
+            if env in defaults.ENV_MAP.keys():
+                env = defaults.ENV_MAP[env]
+            self.app_environment = env
 
     def _get_plaintext_private_key(
             self, ciphertext_blob, encryption_context={}):
