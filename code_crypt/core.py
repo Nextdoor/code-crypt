@@ -236,7 +236,7 @@ class CodeCrypt:
 
             # Break out bin file
             # (RSA ciphertext length == RSA key size in bytes)
-            offset = int(self.rsa_key_size / 8)
+            offset = self.rsa_key_size // 8
             if offset > len(ciphertext_bin):
                 raise errors.InputError(
                     "RSA ciphertext length for secret '%s' is larger than the "
@@ -250,7 +250,7 @@ class CodeCrypt:
             session_key = self.decryptor.decrypt(encrypted_session_key)
             fernet_cipher = Fernet(session_key)
 
-            secret = fernet_cipher.decrypt(ciphertext).decode()
+            secret = fernet_cipher.decrypt(ciphertext).decode('utf-8')
         except Exception as e:
             log.error(
                 "Could not decrypt AES wrapped secret '%s' (Reason: %s)" % (
@@ -291,7 +291,7 @@ class CodeCrypt:
         secrets_dict = {}
 
         for file in os.listdir(self.environment_secrets_dir):
-            if file.endswith(defaults.CIPHERTEXT_EXT) or file.endswith('.bin'):
+            if file.endswith(defaults.CIPHERTEXT_EXT):
                 secret_name = self._chomp_ext(file)
                 secrets_dict[secret_name] = os.path.join(
                     self.environment_secrets_dir, file)
@@ -303,9 +303,9 @@ class CodeCrypt:
         APP_PROPERTIES environment variable.
 
         Note: This is for ECS based applications only.'''
-        if os.getenv('APP_PROPERTIES') is not None:
-            app_properties = os.getenv('APP_PROPERTIES').split('\n')
-            app_tag = 'app_environment'
+        if os.getenv(u'APP_PROPERTIES') is not None:
+            app_properties = os.getenv(u'APP_PROPERTIES').split('\n')
+            app_tag = u'app_environment'
             app_environment = [
                 y for y in app_properties if y.startswith(app_tag)][0]
             return app_environment.split('=')[1]
@@ -320,8 +320,6 @@ class CodeCrypt:
         try:
             string.encode('ascii')
         except UnicodeEncodeError:
-            return False
-        except UnicodeDecodeError:
             return False
 
         return True

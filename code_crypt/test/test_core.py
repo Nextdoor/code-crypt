@@ -10,12 +10,12 @@ from code_crypt import core as code_crypt
 from code_crypt import errors
 
 APP_ROOT = tempfile.mkdtemp()
-DATA_DIR = 'code_crypt_data'
-ENV = 'test'
-EXT = '.bin'
-KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+DATA_DIR = u'code_crypt_data'
+ENV = u'test'
+EXT = u'.bin'
+KMS_KEY_ID = u'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
-TEST_VALID_JSON = """{
+TEST_VALID_JSON = u"""{
   "SECRET_NAME_A": "AAA",
   "SECRET_NAME_B": "BBB"
 }"""
@@ -58,7 +58,7 @@ qobQ0eUCgYEAoMhv5SsaFyk53pjXuqllX4tOiq2FAC8iUfnmGoXOAgOMb/Y0DxZo
 RnzPabvLpiSymUdlOMiTOBG1IEioY48rYt/JRzwywcZJ24dm3FE5/cM=
 -----END RSA PRIVATE KEY-----"""
 
-TEST_ENCRYPTED_PRIVATE_KEY = """AQICAHhiG23RsuSTqwlDgwSBWuBR8vtuEXp93gSa1U3HT2
+TEST_ENCRYPTED_PRIVATE_KEY = u"""AQICAHhiG23RsuSTqwlDgwSBWuBR8vtuEXp93gSa1U3HT2
 B6gwFXBr/FJsoxfaluFn9dEQaXAAAG9zCCBvMGCSqGSIb3DQEHBqCCBuQwggbgAgEAMIIG2QYJKoZI
 hvcNAQcBMB4GCWCGSAFlAwQBLjARBAwRxVHAc1aReGMBLLUCARCAggaqcBmtFSHgQYH8xRJCnkcNyc
 5HAtYG0jz+yA/DUKyWNaaPzqdx2+sFYVttHEjv/P5i01DwYuzn5AT7dSi73cTvXn0znShV+GsGC7WQ
@@ -93,7 +93,7 @@ CMJ0pdKGEMy/44aY1Y2cq7AXC5SPH+ie+iAzs/keOvBbjbniJK4Uf+PMQJq0KMjzLyw0KXYS6RzinW
 n91rMuBMWam1FHtcPdLeXFw1NX68NtUfiB48keI1tBgo="""
 
 # Sample RSA Private Key
-LARGE_SECRET = """-----BEGIN RSA PRIVATE KEY-----
+LARGE_SECRET = u"""-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUp
 wmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ5
 1s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQABAoGAFijko56+qGyN8M0RVyaRAXz++xTqHBLh
@@ -124,16 +124,16 @@ class TestGenerateKeyPair(unittest.TestCase):
             APP_ROOT, DATA_DIR, 'keys', ENV, 'encrypted_private_key.pem')
 
     def test_generate_key_pair_with_missing_private_key(self):
-        with open(self.expected_public_key_file, 'w') as f:
-            f.write('')
+        with open(self.expected_public_key_file, 'wb') as f:
+            f.write(b'')
 
         self.assertRaises(
             errors.CodeCryptError,
             lambda: self.cc_obj.generate_key_pair())
 
     def test_generate_key_pair_with_missing_public_key_only(self):
-        with open(self.expected_private_key_file, 'w') as f:
-            f.write('')
+        with open(self.expected_private_key_file, 'wb') as f:
+            f.write(b'')
 
         self.assertRaises(
             errors.CodeCryptError,
