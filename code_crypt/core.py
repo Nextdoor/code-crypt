@@ -176,37 +176,43 @@ class CodeCrypt:
             raise errors.DecryptorError(
                 "private key is malformed. (Reason: %s)" % (str(e)))
 
-    def _validate_secret(self, secret_name, secret):
-        # secret must have a value
-        if len(secret_name) == 0:
-            raise errors.InputError(
-                "secret name '%s' must be greather than length of 0" % (
-                    secret_name))
+    def _validate_secret(self, secret_name, secret, blob_mode):
+        if not blob_mode:
+            # secret must have a value
+            if len(secret_name) == 0:
+                raise errors.InputError(
+                    "secret name '%s' must be greather than length of 0" % (
+                        secret_name))
 
-        # secret name can only contain ascii characters
-        if not self._is_ascii(secret_name):
-            raise errors.InputError(
-                "secret name '%s' must contain only ASCII chars" % (
-                    secret_name))
+            # secret name can only contain ascii characters
+            if not self._is_ascii(secret_name):
+                raise errors.InputError(
+                    "secret name '%s' must contain only ASCII chars" % (
+                        secret_name))
 
         # warn when secret value contains non-ascii chars
         if not self._is_ascii(secret):
             log.warn("Secret '%s' contains non-ASCII chars." % (
                 secret_name))
 
-    def _encrypt(self, secret_name, secret):
+    def _encrypt(self, secret_name, secret, blob_mode=False):
         '''Encrypt a single secret name and value pair into the data
         directory by environment.'''
-        self._validate_secret(secret_name, secret)
+        self._validate_secret(secret_name, secret, blob_mode)
         secret = secret.encode('utf-8')
 
         ciphertext_bin = self._encrypt_with_aes_session_key(secret)
+        ciphertext_bin_b64 = b64encode(ciphertext_bin)
 
+        if blob_mode:
+            return ciphertext_bin_b64
+
+        # if not a blob_encrypt, then write to file
         filename = secret_name + self.ciphertext_ext
         secret_filepath = os.path.join(self.environment_secrets_dir, filename)
 
         with open(secret_filepath, 'wb') as f:
-            f.write(b64encode(ciphertext_bin))
+            f.write(ciphertext_bin_b64)
 
     def _encrypt_with_aes_session_key(self, secret):
         '''Creates a AES-CBC 128 bit session key and to encrypt secrets with
@@ -233,31 +239,37 @@ class CodeCrypt:
             log.info(secret_name)
             self._encrypt(secret_name, secret)
 
-    def _decrypt_aes_wrapped_file(self, secret_file):
-        '''Decrypts a binary file which contains an RSA encrypted AES session
+    def _decrypt_secret_blob(self, secret_blob):
+        '''Decrypts a binary blob which contains an RSA encrypted AES session
         key and AES encrypted data.'''
+        ciphertext_bin = b64decode(secret_blob)
+
+        # Break out bin file
+        # (RSA ciphertext length == RSA key size in bytes)
+        # divide by 8 is for bit to byte conversion
+        offset = self.rsa_key_size // 8
+        if offset > len(ciphertext_bin):
+            raise errors.InputError(
+                "RSA ciphertext length is larger than the "
+                "secret ciphertext binary length")
+
+        encrypted_session_key = ciphertext_bin[:offset]
+        ciphertext = ciphertext_bin[offset:]
+
+        # decrypt aes session key with rsa private key
+        session_key = self.decryptor.decrypt(encrypted_session_key)
+        fernet_cipher = Fernet(session_key)
+
+        secret = fernet_cipher.decrypt(ciphertext).decode('utf-8')
+        return secret
+
+    def _decrypt_aes_wrapped_file(self, secret_file):
+        '''Decrypts a binary file which a base64 encoded secrets blob.'''
         try:
             with open(secret_file, 'rb') as f:
-                ciphertext_bin = b64decode(f.read())
+                secret_blob = f.read()
 
-            # Break out bin file
-            # (RSA ciphertext length == RSA key size in bytes)
-            # divide by 8 is for bit to byte conversion
-            offset = self.rsa_key_size // 8
-            if offset > len(ciphertext_bin):
-                raise errors.InputError(
-                    "RSA ciphertext length for secret '%s' is larger than the "
-                    "secret ciphertext binary length" % (
-                        os.path.basename(secret_file)))
-
-            encrypted_session_key = ciphertext_bin[:offset]
-            ciphertext = ciphertext_bin[offset:]
-
-            # decrypt aes session key with rsa private key
-            session_key = self.decryptor.decrypt(encrypted_session_key)
-            fernet_cipher = Fernet(session_key)
-
-            secret = fernet_cipher.decrypt(ciphertext).decode('utf-8')
+            secret = self._decrypt_secret_blob(secret_blob)
         except Exception as e:
             log.error(
                 "Could not decrypt AES wrapped secret '%s' (Reason: %s)" % (
@@ -388,7 +400,7 @@ class CodeCrypt:
             f.write(public_key_pem)
 
     def encrypt(self, secret_name, secret, public_key=None):
-        '''Single secret encryptor
+        '''Single secret encrypt
 
         Takes in a single key-value pair secret and encrypts it with AES. The
         AES session key is then encrypted asymmetrically with RSA so that
@@ -408,8 +420,21 @@ class CodeCrypt:
         log.info('Encrypting...')
         self._encrypt(secret_name, secret)
 
+    def blob_encrypt(self, secret, public_key=None):
+        '''Single secret encrypt that returns an encrypted blob
+
+        Takes in a single value and encrypts with it RSA-AES hybrid and returns
+        an encrypted base64 encrypted binary blob.
+
+        Args:
+            secret: secret value
+            public_key: public RSA to encrypt secrets
+        '''
+        self._set_encryptor(public_key)
+        return self._encrypt(None, secret, blob_mode=True)
+
     def import_secrets(self, secrets_json, public_key=None):
-        '''Secrets JSON enrypter
+        '''Secrets JSON encryption
 
         Takes in a JSON object in the form of key-value pairs, initializes an
         encryptor based on a public key and writes it to into the data
@@ -430,7 +455,7 @@ class CodeCrypt:
             secret_name=None,
             plaintext_private_key=None,
             encrypted_private_key=None):
-        '''Secrets decrypter to JSON
+        '''Decrypt secrets to JSON
 
         Takes in a single secret to decrypt, or none to decrypt all of them to
         produce a dict result of key-value pairs.
@@ -464,3 +489,32 @@ class CodeCrypt:
             return self._decrypt_secret(secret_name)
 
         return self._decrypt_all_secrets()
+
+    def blob_decrypt(
+            self,
+            secret_blob,
+            plaintext_private_key=None,
+            encrypted_private_key=None):
+        '''Decrypts a base64 encoded encrypted binary to a plaintext secret
+
+        Either a plaintext RSA private key can be provided, or a KMS encrypted
+        RSA private key. In the latter case, a KMS decrypt operation will need
+        to be allowed on the derived KMS key.
+
+        Args:
+            secret blob: base64 encoded encrypted binary
+            plaintext_private_key: private RSA key to decrypt AES session keys
+            encrypted_private_key: encrypted version of the the private key
+
+        Returns:
+            decrypted secret string
+        '''
+        if plaintext_private_key and encrypted_private_key:
+            raise errors.CodeCryptError(
+                'both plaintext and encrypted private keys cannot be provided')
+
+        self._set_decryptor(
+            plaintext_private_key=plaintext_private_key,
+            encrypted_private_key=encrypted_private_key)
+
+        return self._decrypt_secret_blob(secret_blob)

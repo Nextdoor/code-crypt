@@ -43,7 +43,15 @@ def get_config(argv):
         help="imports and encrypts secrets from a json file")
     action_group.add_argument(
         "--encrypt",
-        help="encrypts single secret (usage: KEY=value)")
+        help="encrypts a single secret (usage: KEY=value)")
+    action_group.add_argument(
+        "--blob-encrypt",
+        help="encrypts a single secret and returns an encrypted blob binary "
+             "(usage: value)")
+    action_group.add_argument(
+        "--blob-decrypt",
+        help="decrypts an encrypted blob binary and returns a plaintext "
+             "secret (usage: blob value)")
     action_group.add_argument(
         "-v",
         "--version",
@@ -98,7 +106,6 @@ def main():
             secret = code_crypt_obj.decrypt(config.decrypt)
             if secret:
                 print(secret)
-                return
             return
         if config.decrypt_all:
             secrets = code_crypt_obj.decrypt()
@@ -118,9 +125,18 @@ def main():
             keyval = config.encrypt.split('=')
             code_crypt_obj.encrypt(keyval[0], keyval[1])
             return
+        if config.blob_encrypt:
+            blob = code_crypt_obj.blob_encrypt(config.blob_encrypt)
+            print(blob)
+            return
+        if config.blob_decrypt:
+            secret = code_crypt_obj.blob_decrypt(config.blob_decrypt)
+            if secret:
+                print(secret)
+            return
 
     except errors.CodeCryptError as e:
-        print(str(e))
+        print(str(e.message))
         exit(1)
 
 if __name__ == '__main__':

@@ -107,6 +107,8 @@ U9VQQSQzY1oZMVX8i1m5WUTLPz2yLJIBQVdXqhMCQBGoiuSoSjafUhV7i1cEGpb88h5NBYZzWXGZ
 37sJ5QsW+sJyoNde3xH8vdXhzU7eT82D6X/scw9RZz+/6rCJ4p0=
 -----END RSA PRIVATE KEY-----"""
 
+TEST_SECRET = u"""QG8vdf05hpMSn9+ihB07JWZLL8PV/AQTe5quZORUku6FyRuvwpTfh6jgPVZ7Nifydf16BXm98TpJ/LRVg/jEPhL2cqrPEeJ8H6iMA712gKy9KmGEl29zLY10c0/QBYscgG6GuqVzWZUYV2Nvf0CTE6MT1wtWFHzCiQNbgcKbPpdHoAd19E+pSJIPROOVevTsN3QPBCfIMSIRNRFAfELZqS48/FcZaYkfv+GVGV1Bp00Uldy75lqqVwYLi5LEWi2xSmgucdKovh6I9IRyRd10b2LZR6HDw5jjazPVqkpKrNR+DMlKsjCTIPFxsYuzSOSETuTc/N7bKvNTFVQx5UA7IWdBQUFBQUJacElYSl92QTNKSmd3Vm9DbEhiMFlUdjFHR3BkTGg3UGVXc0hEeGp2NC1sZTZLaUJ5aUJpUlpCeV9ySzJJcGR3ejltZnZQRXRJNmg2NzE5TXFRV0RrZTU0Zy1aY3NQQWpMVUhRa0tiakVmQTN6SVQ0PQ=="""
+
 
 class TestGenerateKeyPair(unittest.TestCase):
 
@@ -346,6 +348,39 @@ class TestDecrypt(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
+class TestBlobEncryptDecrypt(unittest.TestCase):
+
+    def setUp(self):
+        self.cc_obj = code_crypt.CodeCrypt(
+            kms_key_id=KMS_KEY_ID,
+            app_root=APP_ROOT,
+            env=ENV,
+            ciphertext_ext=EXT)
+
+    @mock.patch("boto3.client")
+    def test_decrypt_secret_with_kms(self, mock_client):
+        secret = 'DDD'
+        secret_blob = self.cc_obj.blob_encrypt(secret, TEST_PUBLIC_KEY)
+        mock_client.return_value = mock.MagicMock()
+
+        self.cc_obj = code_crypt.CodeCrypt(
+            kms_key_id=KMS_KEY_ID,
+            app_root=APP_ROOT,
+            env=ENV,
+            ciphertext_ext=EXT)
+
+        self.cc_obj.kms.decrypt.return_value = {
+            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        decrypted_result = self.cc_obj.blob_decrypt(
+            secret_blob,
+            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
+
+        mock_client.assert_called_with('kms', region_name='us-east-1')
+
+        self.assertEqual(decrypted_result, secret)
+
+    def tearDown(self):
+        shutil.rmtree(APP_ROOT)
 
 class TestEncrypt(unittest.TestCase):
 
