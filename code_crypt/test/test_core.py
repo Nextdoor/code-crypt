@@ -346,6 +346,39 @@ class TestDecrypt(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
+class TestBlobEncryptDecrypt(unittest.TestCase):
+
+    def setUp(self):
+        self.cc_obj = code_crypt.CodeCrypt(
+            kms_key_id=KMS_KEY_ID,
+            app_root=APP_ROOT,
+            env=ENV,
+            ciphertext_ext=EXT)
+
+    @mock.patch("boto3.client")
+    def test_decrypt_secret_with_kms(self, mock_client):
+        secret = 'DDD'
+        secret_blob = self.cc_obj.blob_encrypt(secret, TEST_PUBLIC_KEY)
+        mock_client.return_value = mock.MagicMock()
+
+        self.cc_obj = code_crypt.CodeCrypt(
+            kms_key_id=KMS_KEY_ID,
+            app_root=APP_ROOT,
+            env=ENV,
+            ciphertext_ext=EXT)
+
+        self.cc_obj.kms.decrypt.return_value = {
+            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        decrypted_result = self.cc_obj.blob_decrypt(
+            secret_blob,
+            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
+
+        mock_client.assert_called_with('kms', region_name='us-east-1')
+
+        self.assertEqual(decrypted_result, secret)
+
+    def tearDown(self):
+        shutil.rmtree(APP_ROOT)
 
 class TestEncrypt(unittest.TestCase):
 
