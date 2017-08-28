@@ -74,6 +74,8 @@ class CodeCrypt:
 
         self.encryption_context = {'app_environment': self.app_environment}
         self._init_kms_client(aws_region)
+        self.encryptor = None
+        self.decryptor = None
 
     def _init_kms_client(self, aws_region):
         '''Initializes a kms boto3 client.'''
@@ -117,6 +119,9 @@ class CodeCrypt:
 
     def _set_encryptor(self, public_key):
         '''Creates a OAEP decryptor based on a RSA private key.'''
+        if self.encryptor is not None:
+            return
+
         if not public_key:
             try:
                 with open(self.public_key_file, 'rb') as f:
@@ -135,22 +140,14 @@ class CodeCrypt:
             raise errors.EncryptorError(
                 "public key is malformed. (Reason: %s)" % (str(e)))
 
-    class Decryptor:
-        '''Helper class which creates a decryptor object with default
-        padding.'''
-        def __init__(self, private_key_obj, padding=defaults.RSA_PADDING):
-            self.private_key_obj = private_key_obj
-            self.padding = padding
-
-        def decrypt(self, data):
-            plaintext = self.private_key_obj.decrypt(data, self.padding)
-            return plaintext
-
     def _set_decryptor(
             self,
             plaintext_private_key=None,
             encrypted_private_key=None):
         '''Creates a OAEP decryptor based on a RSA private key.'''
+        if self.decryptor is not None:
+            return
+
         if not plaintext_private_key:
             if not encrypted_private_key:
                 try:
