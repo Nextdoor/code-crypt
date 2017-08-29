@@ -239,7 +239,10 @@ class CodeCrypt:
     def _decrypt_secret_blob(self, secret_blob):
         '''Decrypts a binary blob which contains an RSA encrypted AES session
         key and AES encrypted data.'''
-        ciphertext_bin = b64decode(secret_blob)
+        try:
+            ciphertext_bin = b64decode(secret_blob)
+        except TypeError:
+            raise errors.InputError("ciphertext blob is not base64 encoded")
 
         # Break out bin file
         # (RSA ciphertext length == RSA key size in bytes)
@@ -253,11 +256,18 @@ class CodeCrypt:
         encrypted_session_key = ciphertext_bin[:offset]
         ciphertext = ciphertext_bin[offset:]
 
-        # decrypt aes session key with rsa private key
-        session_key = self.decryptor.decrypt(encrypted_session_key)
-        fernet_cipher = Fernet(session_key)
+        secret = None
 
-        secret = fernet_cipher.decrypt(ciphertext).decode('utf-8')
+        try:
+            # decrypt aes session key with rsa private key
+            session_key = self.decryptor.decrypt(encrypted_session_key)
+            fernet_cipher = Fernet(session_key)
+
+            secret = fernet_cipher.decrypt(ciphertext).decode('utf-8')
+        # A number of ciphertext issues could cause AES-RSA decryption to fail
+        except Exception:
+            raise errors.InputError("ciphertext binary is corrupt")
+
         return secret
 
     def _decrypt_aes_wrapped_file(self, secret_file):

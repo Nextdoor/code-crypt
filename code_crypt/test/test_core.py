@@ -107,6 +107,12 @@ U9VQQSQzY1oZMVX8i1m5WUTLPz2yLJIBQVdXqhMCQBGoiuSoSjafUhV7i1cEGpb88h5NBYZzWXGZ
 37sJ5QsW+sJyoNde3xH8vdXhzU7eT82D6X/scw9RZz+/6rCJ4p0=
 -----END RSA PRIVATE KEY-----"""
 
+TEST_BASE64_TEXT = u"""QmFzZTY0IGlzIGEgZ3JvdXAgb2Ygc2ltaWxhciBiaW5hcnktdG8tdG
+V4dCBlbmNvZGluZyBzY2hlbWVzIHRoYXQgcmVwcmVzZW50IGJpbmFyeSBkYXRhIGluIGFuIEFTQ0l
+JIHN0cmluZyBmb3JtYXQgYnkgdHJhbnNsYXRpbmcgaXQgaW50byBhIHJhZGl4LTY0IHJlcHJlc2Vu
+dGF0aW9uLiBUaGUgdGVybSBCYXNlNjQgb3JpZ2luYXRlcyBmcm9tIGEgc3BlY2lmaWMgTUlNRSBjb
+250ZW50IHRyYW5zZmVyIGVuY29kaW5nLg0KRWFjaCBiYXNlNjQgZGlnaXQgcmVwcmVzZW50cyBleG
+FjdGx5IDYgYml0cyBvZiBkYXRhLg=="""
 
 class TestGenerateKeyPair(unittest.TestCase):
 
@@ -356,7 +362,7 @@ class TestBlobEncryptDecrypt(unittest.TestCase):
             ciphertext_ext=EXT)
 
     @mock.patch("boto3.client")
-    def test_decrypt_secret_with_kms(self, mock_client):
+    def test_blob_decrypt_secret_with_kms(self, mock_client):
         secret = 'DDD'
         secret_blob = self.cc_obj.blob_encrypt(secret, TEST_PUBLIC_KEY)
         mock_client.return_value = mock.MagicMock()
@@ -379,6 +385,33 @@ class TestBlobEncryptDecrypt(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
+
+class TestBlobDecrypt(unittest.TestCase):
+
+    def setUp(self):
+        self.cc_obj = code_crypt.CodeCrypt(
+            kms_key_id=KMS_KEY_ID,
+            app_root=APP_ROOT,
+            env=ENV,
+            ciphertext_ext=EXT)
+
+    def test_blob_decrypt_with_invalid_short_secret(self):
+        self.assertRaises(
+            errors.InputError,
+            lambda: self.cc_obj.blob_decrypt('FOO'))
+
+    def test_blob_decrypt_with_invalid_base64_value(self):
+        self.assertRaises(
+            errors.InputError,
+            lambda: self.cc_obj.blob_decrypt('FOOFOOFOOFOOFOOFOOFOO'))
+
+    def test_blob_decrypt_with_invalid_base64_decoded_value(self):
+        self.assertRaises(
+            errors.InputError,
+            lambda: self.cc_obj.blob_decrypt(TEST_BASE64_TEXT))
+
+    def tearDown(self):
+        shutil.rmtree(APP_ROOT) 
 
 class TestEncrypt(unittest.TestCase):
 
