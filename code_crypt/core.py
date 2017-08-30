@@ -243,7 +243,7 @@ class CodeCrypt:
     def _convert_blob_to_bin(self, secret_blob):
         try:
             ciphertext_bin = b64decode(secret_blob)
-        except TypeError:
+        except Exception:
             raise errors.InputError("ciphertext blob is not base64 encoded")
 
         if self.offset > len(ciphertext_bin):
