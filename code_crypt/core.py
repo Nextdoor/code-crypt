@@ -59,6 +59,10 @@ class CodeCrypt:
         self.rsa_key_size = rsa_key_size
         self.ext_len = len(self.ciphertext_ext)
 
+        # (RSA ciphertext length == RSA key size in bytes)
+        # divide by 8 is for bit to byte conversion
+        self.offset = self.rsa_key_size // 8
+
         self._init_env(env)
 
         data_dir = os.path.join(app_root, defaults.DATA_DIR)
@@ -236,25 +240,27 @@ class CodeCrypt:
             log.info(secret_name)
             self._encrypt(secret_name, secret)
 
-    def _decrypt_secret_blob(self, secret_blob):
-        '''Decrypts a binary blob which contains an RSA encrypted AES session
-        key and AES encrypted data.'''
+    def _convert_blob_to_bin(self, secret_blob):
         try:
             ciphertext_bin = b64decode(secret_blob)
-        except TypeError:
+        except Exception:
             raise errors.InputError("ciphertext blob is not base64 encoded")
 
-        # Break out bin file
-        # (RSA ciphertext length == RSA key size in bytes)
-        # divide by 8 is for bit to byte conversion
-        offset = self.rsa_key_size // 8
-        if offset > len(ciphertext_bin):
+        if self.offset > len(ciphertext_bin):
             raise errors.InputError(
                 "RSA ciphertext length is larger than the "
                 "secret ciphertext binary length")
 
-        encrypted_session_key = ciphertext_bin[:offset]
-        ciphertext = ciphertext_bin[offset:]
+        return ciphertext_bin
+
+    def _decrypt_secret_blob(self, secret_blob):
+        '''Decrypts a binary blob which contains an RSA encrypted AES session
+        key and AES encrypted data.'''
+
+        # Break out base64 encoded binary to encrypted session key and data
+        ciphertext_bin = self._convert_blob_to_bin(secret_blob)
+        encrypted_session_key = ciphertext_bin[:self.offset]
+        ciphertext = ciphertext_bin[self.offset:]
 
         secret = None
 
@@ -519,6 +525,9 @@ class CodeCrypt:
         if plaintext_private_key and encrypted_private_key:
             raise errors.CodeCryptError(
                 'both plaintext and encrypted private keys cannot be provided')
+
+        # We perform this here to validate the secret blob early
+        self._convert_blob_to_bin(secret_blob)
 
         self._set_decryptor(
             plaintext_private_key=plaintext_private_key,
