@@ -99,12 +99,13 @@ class CodeCrypt:
             os.makedirs(self.environment_keys_dir)
 
     def _init_env(self, env):
-        self.app_environment = self._app_environment()
-
         if env:
             if env in defaults.ENV_MAP.keys():
                 env = defaults.ENV_MAP[env]
             self.app_environment = env
+            return
+
+        self.app_environment = defaults.DEFAULT_ENV
 
     def _get_plaintext_private_key(
             self, ciphertext_blob, encryption_context={}):
@@ -329,20 +330,6 @@ class CodeCrypt:
                     self.environment_secrets_dir, file)
 
         return secrets_dict
-
-    def _app_environment(self):
-        '''Derive and a return the application environment based on the
-        APP_PROPERTIES environment variable.
-
-        Note: This is for ECS based applications only.'''
-        if os.getenv(u'APP_PROPERTIES') is not None:
-            app_properties = os.getenv(u'APP_PROPERTIES').split('\n')
-            app_tag = u'app_environment'
-            app_environment = [
-                y for y in app_properties if y.startswith(app_tag)][0]
-            return app_environment.split('=')[1]
-
-        return defaults.DEFAULT_ENV
 
     def _chomp_ext(self, string):
         '''Remove the extension of a filename.'''
