@@ -1,6 +1,6 @@
 [![CircleCI](https://circleci.com/gh/Nextdoor/code-crypt.svg)](https://circleci.com/gh/Nextdoor/code-crypt)
 
-# Code Crypt - Asymmetric KMS Secret Encryption
+# Code Crypt
 
 Code Crypt provides a simple Python library and command line interface to 
 manage your application secrets within a project repository. Master keys are
