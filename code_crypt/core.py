@@ -117,7 +117,7 @@ class CodeCrypt:
                 EncryptionContext=encryption_context)
         except Exception as e:
             raise errors.KmsError(
-                "Could not encrypt private key using KMS "
+                "Could not decrypt private key using KMS "
                 "key '%s' (Reason: %s)" % (self.kms_key_id, str(e)))
 
         return response[u'Plaintext']
