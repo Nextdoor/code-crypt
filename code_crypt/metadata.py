@@ -13,5 +13,5 @@
 # Copyright 2017 Nextdoor.com, Inc
 
 
-__version__ = '0.0.9'
+__version__ = '0.0.10'
 __desc__ = 'Code Crypt'
