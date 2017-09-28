@@ -43,15 +43,16 @@ def get_config(argv):
         help="imports and encrypts secrets from a json file")
     action_group.add_argument(
         "--encrypt",
-        help="encrypts a single secret (usage: KEY=value)")
+        help="encrypts a single secret (usage: "
+             "--encrypt SOME_SECRET_NAME=some_secret_value)")
     action_group.add_argument(
         "--blob-encrypt",
         help="encrypts a single secret and returns an encrypted blob binary "
-             "(usage: value)")
+             "(usage: --blob-encrypt some_secret_value)")
     action_group.add_argument(
         "--blob-decrypt",
         help="decrypts an encrypted blob binary and returns a plaintext "
-             "secret (usage: blob value)")
+             "secret (usage: --blob-decrypt some_code_crypt_secret_blob)")
     action_group.add_argument(
         "-v",
         "--version",
@@ -78,6 +79,7 @@ def get_config(argv):
 
 def main():
     config = get_config(sys.argv)
+
     if config.debug:
         logging.basicConfig(level=logging.DEBUG)
     elif config.verbose:
@@ -122,7 +124,11 @@ def main():
             code_crypt_obj.import_secrets(secrets_json)
             return
         if config.encrypt:
-            keyval = config.encrypt.split('=')
+            if '=' not in config.encrypt:
+                raise errors.InputError("provide a key value pair (usage: "
+                                        "--encrypt SOME_SECRET_NAME=some_"
+                                        "secret_value)")
+            keyval = config.encrypt.split('=', 1)
             code_crypt_obj.encrypt(keyval[0], keyval[1])
             return
         if config.blob_encrypt:
@@ -138,6 +144,7 @@ def main():
     except errors.CodeCryptError as e:
         print(str(e.message))
         exit(1)
+
 
 if __name__ == '__main__':
     main()
