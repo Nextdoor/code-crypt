@@ -111,7 +111,7 @@ def main():
             return
         if config.decrypt_all:
             secrets = code_crypt_obj.decrypt()
-            print(json.dumps(secrets, indent=2))
+            print(json.dumps(secrets, indent=2, sort_keys=True))
             return
         if config.import_secrets:
             secrets_file = config.import_secrets
