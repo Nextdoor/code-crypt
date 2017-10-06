@@ -18,6 +18,14 @@ It supports Python 2.6 or newer and all Python 3 versions.
 - CRUD operations on a per-secret basis
 - Environment contexts (development, staging, production)
 
+## Installation
+
+0) Clone the project locally.
+1) `virtualenv .venv && source .venv/bin/activate`
+2) `make init`
+3) `make install`
+4) Test: `code-crypt --version`
+
 ## Initialize Project
 
 We have a project `my_project` that we'd like to initialize with 3 different 
