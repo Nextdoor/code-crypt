@@ -19,17 +19,18 @@ from setuptools import setup, find_packages
 from code_crypt.metadata import __desc__, __version__
 
 PACKAGE = 'code_crypt'
+REPO_URL = 'https://github.com/Nextdoor/code-crypt'
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 setup(
     name=PACKAGE,
     version=__version__,
     description=__desc__,
-    long_description=open('%s/README.md' % DIR).read(),
+    long_description='See %s for more details.' % REPO_URL,
     author='Nextdoor Engineering',
     author_email='nehal@nextdoor.com',
-    url='https://github.com/Nextdoor/code-crypt',
-    download_url='https://github.com/Nextdoor/code-crypt/tarball/v0.0.10',
+    url=REPO_URL,
+    download_url='%s/tarball/v%s' % REPO_URL, __version__,
     license='Apache License, Version 2.0',
     packages=find_packages(),
     test_suite='nose.collector',
