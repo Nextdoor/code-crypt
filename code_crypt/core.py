@@ -69,7 +69,7 @@ class CodeCrypt:
         self._init_dirs(data_dir)
 
         self.encrypted_private_key_file = os.path.join(
-                self.environment_keys_dir, 'encrypted_private_key.pem')
+            self.environment_keys_dir, 'encrypted_private_key.pem')
         if encrypted_private_key_file:
             self.encrypted_private_key_file = encrypted_private_key_file
 
@@ -189,12 +189,17 @@ class CodeCrypt:
             # secret name can only contain ascii characters
             if not self._is_ascii(secret_name):
                 raise errors.InputError(
-                    "secret name '%s' must contain only ASCII chars" % (
+                    "secret name '%s' must contain only ASCII chararacters" % (
                         secret_name))
 
         # warn when secret value contains non-ascii chars
         if not self._is_ascii(secret):
-            log.warn("Secret '%s' contains non-ASCII chars." % (
+            log.warn("Secret '%s' contains non-ASCII characters!" % (
+                secret_name))
+
+        # warn when secret value contains escape characters (e.g. "\r")
+        if "\\" in secret:
+            log.warn("Secret '%s' contains escape sequence characters!" % (
                 secret_name))
 
     def _encrypt(self, secret_name, secret, blob_mode=False):
