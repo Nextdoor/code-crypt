@@ -114,6 +114,7 @@ dGF0aW9uLiBUaGUgdGVybSBCYXNlNjQgb3JpZ2luYXRlcyBmcm9tIGEgc3BlY2lmaWMgTUlNRSBjb
 250ZW50IHRyYW5zZmVyIGVuY29kaW5nLg0KRWFjaCBiYXNlNjQgZGlnaXQgcmVwcmVzZW50cyBleG
 FjdGx5IDYgYml0cyBvZiBkYXRhLg=="""
 
+
 class TestGenerateKeyPair(unittest.TestCase):
 
     def setUp(self):
@@ -158,7 +159,7 @@ class TestGenerateKeyPair(unittest.TestCase):
             ciphertext_ext=EXT)
 
         self.cc_obj.kms.encrypt.return_value = {
-                'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
+            'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
 
         self.cc_obj.generate_key_pair()
 
@@ -219,7 +220,8 @@ class TestDecrypt(unittest.TestCase):
             ciphertext_ext=EXT)
 
     def test_decrypt_with_missing_private_key_file(self):
-        self.assertRaises(errors.InputError, lambda: self.cc_obj.decrypt('FOO'))
+        self.assertRaises(
+            errors.InputError, lambda: self.cc_obj.decrypt('FOO'))
 
     def test_decrypt_with_malformed_private_key(self):
         self.assertRaises(
@@ -251,7 +253,8 @@ class TestDecrypt(unittest.TestCase):
             lambda: self.cc_obj.decrypt('FOO'))
 
     def test_decrypt_all_with_no_secrets(self):
-        decrypted_result = self.cc_obj.decrypt(plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
+        decrypted_result = self.cc_obj.decrypt(
+            plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
         self.assertEquals(decrypted_result, {})
 
     @mock.patch("boto3.client")
@@ -352,6 +355,7 @@ class TestDecrypt(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
+
 class TestBlobEncryptDecrypt(unittest.TestCase):
 
     def setUp(self):
@@ -386,6 +390,7 @@ class TestBlobEncryptDecrypt(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
+
 class TestBlobDecrypt(unittest.TestCase):
 
     def setUp(self):
@@ -411,7 +416,8 @@ class TestBlobDecrypt(unittest.TestCase):
             lambda: self.cc_obj.blob_decrypt(TEST_BASE64_TEXT))
 
     def tearDown(self):
-        shutil.rmtree(APP_ROOT) 
+        shutil.rmtree(APP_ROOT)
+
 
 class TestEncrypt(unittest.TestCase):
 
@@ -464,7 +470,8 @@ class TestEncrypt(unittest.TestCase):
         new_secret = 'BBB'
         self.cc_obj.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
 
-        self.cc_obj.encrypt(secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt(
+            secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
 
         decrypted_result = self.cc_obj.decrypt(
             secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)

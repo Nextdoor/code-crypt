@@ -6,7 +6,7 @@ install:
 	python setup.py install
 
 lint:
-	pep8 **/*.py
+	pycodestyle code_crypt/
 	pyflakes code_crypt/
 
 test:

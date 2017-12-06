@@ -4,6 +4,7 @@ from code_crypt import cli
 
 KMS_KEY_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
+
 class CliTest(unittest.TestCase):
     '''This is a simple sanity check that argparser is setup properly'''
 
