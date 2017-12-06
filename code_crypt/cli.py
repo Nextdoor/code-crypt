@@ -86,6 +86,8 @@ def main():
         logging.basicConfig(level=logging.INFO)
     elif config.quiet:
         logging.disable(sys.maxint)
+    else:
+        logging.basicConfig()
 
     if config.version:
             print("Code Crypt - " + str(__version__))
