@@ -1,5 +1,6 @@
 # coding: utf8
 
+import base64
 import mock
 import os
 import shutil
@@ -117,6 +118,14 @@ FjdGx5IDYgYml0cyBvZiBkYXRhLg=="""
 
 class TestGenerateKeyPair(unittest.TestCase):
 
+    def _is_base64(self, s):
+        try:
+            base64.b64decode(s)
+            return True
+        except Exception:
+            pass
+        return False
+
     def setUp(self):
         self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
@@ -146,7 +155,6 @@ class TestGenerateKeyPair(unittest.TestCase):
             errors.CodeCryptError,
             lambda: self.cc_obj.generate_key_pair())
 
-    # TODO: mock and test for write out of keys instead of exiting
     @mock.patch("boto3.client")
     def test_generate_key_pair_with_no_existing_keys(
             self, mock_client):
@@ -165,16 +173,19 @@ class TestGenerateKeyPair(unittest.TestCase):
 
         mock_client.assert_called_with('kms', region_name='us-east-1')
 
-        # try:
-        #     with open(self.expected_public_key_file, 'r') as f:
-        #         public_key = f.read()
+        try:
+            with open(self.expected_public_key_file, 'r') as f:
+                public_key = f.read()
 
-        #     with open(self.expected_private_key_file, 'r') as f:
-        #         private_key = f.read()
+            with open(self.expected_private_key_file, 'r') as f:
+                private_key = f.read()
 
-        # except IOError as e:
-        #     print('Missing generated keys')
-        #     exit(1)
+        except IOError:
+            print('Cannot write out generate keys.')
+            exit(2)
+
+        self.assertTrue(u'BEGIN PUBLIC' in public_key.split("\n")[0])
+        self.assertTrue(self._is_base64(private_key))
 
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
