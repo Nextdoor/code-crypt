@@ -29,7 +29,7 @@ setup(
     author='Nextdoor Engineering',
     author_email='nehal@nextdoor.com',
     url='https://github.com/Nextdoor/code-crypt',
-    download_url='https://github.com/Nextdoor/code-crypt/tarball/v0.0.10',
+    download_url='https://github.com/Nextdoor/code-crypt/tarball/0.1.0',
     license='Apache License, Version 2.0',
     packages=find_packages(),
     test_suite='nose.collector',
