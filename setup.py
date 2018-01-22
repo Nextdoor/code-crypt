@@ -25,7 +25,7 @@ setup(
     name=PACKAGE,
     version=__version__,
     description=__desc__,
-    long_description=open('%s/README.md' % DIR).read(),
+    long_description=open('%s/README.md' % DIR, 'rb').read().decode('utf8'),
     author='Nextdoor Engineering',
     author_email='nehal@nextdoor.com',
     url='https://github.com/Nextdoor/code-crypt',
