@@ -85,7 +85,10 @@ class CodeCrypt:
     def _init_kms_client(self, aws_region):
         '''Initializes a kms boto3 client.'''
         config = Config(
-            region_name=aws_region, connect_timeout=5, read_timeout=10)
+            region_name=aws_region,
+            connect_timeout=5,
+            read_timeout=10,
+            retries=dict(max_attempts=4))
 
         self.kms = boto3.client('kms', config=config)
 
