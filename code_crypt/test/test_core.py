@@ -7,6 +7,8 @@ import shutil
 import tempfile
 import unittest
 
+from botocore.client import Config
+
 from code_crypt import core as code_crypt
 from code_crypt import errors
 
@@ -156,7 +158,7 @@ class TestGenerateKeyPair(unittest.TestCase):
             lambda: self.cc_obj.generate_key_pair())
 
     @mock.patch("boto3.client")
-    def test_generate_key_pair_with_no_existing_keys(
+    def test_kms_config(
             self, mock_client):
         mock_client.return_value = mock.MagicMock()
 
@@ -171,7 +173,26 @@ class TestGenerateKeyPair(unittest.TestCase):
 
         self.cc_obj.generate_key_pair()
 
-        mock_client.assert_called_with('kms', region_name='us-east-1')
+        self.assertEqual('kms', mock_client.call_args[0][0])
+
+        assert isinstance(mock_client.call_args[1]['config'], Config)
+        self.assertEqual(
+            'us-east-1', mock_client.call_args[1]['config'].region_name)
+
+    @mock.patch("boto3.client")
+    def test_generate_key_pair_with_no_existing_keys(
+            self, mock_client):
+
+        self.cc_obj = code_crypt.CodeCrypt(
+            kms_key_id=KMS_KEY_ID,
+            app_root=APP_ROOT,
+            env=ENV,
+            ciphertext_ext=EXT)
+
+        self.cc_obj.kms.encrypt.return_value = {
+            'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
+
+        self.cc_obj.generate_key_pair()
 
         try:
             with open(self.expected_public_key_file, 'r') as f:
@@ -272,7 +293,6 @@ class TestDecrypt(unittest.TestCase):
     def test_decrypt_secret_with_kms(self, mock_client):
         secret = 'DDD'
         self.cc_obj.encrypt('SECRET_NAME_DDD', secret, TEST_PUBLIC_KEY)
-        mock_client.return_value = mock.MagicMock()
 
         self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
@@ -285,15 +305,12 @@ class TestDecrypt(unittest.TestCase):
         decrypted_result = self.cc_obj.decrypt(
             'SECRET_NAME_DDD',
             encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
-
-        mock_client.assert_called_with('kms', region_name='us-east-1')
 
         self.assertEqual(decrypted_result, secret)
 
     @mock.patch("boto3.client")
     def test_decrypt_large_secret_with_kms(self, mock_client):
         self.cc_obj.encrypt('SECRET_NAME_DDD', LARGE_SECRET, TEST_PUBLIC_KEY)
-        mock_client.return_value = mock.MagicMock()
 
         self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
@@ -306,8 +323,6 @@ class TestDecrypt(unittest.TestCase):
         decrypted_result = self.cc_obj.decrypt(
             'SECRET_NAME_DDD',
             encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
-
-        mock_client.assert_called_with('kms', region_name='us-east-1')
 
         self.assertEqual(decrypted_result, LARGE_SECRET)
 
@@ -319,7 +334,6 @@ class TestDecrypt(unittest.TestCase):
             'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
         self.cc_obj.encrypt(
             'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
-        mock_client.return_value = mock.MagicMock()
 
         self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
@@ -331,8 +345,6 @@ class TestDecrypt(unittest.TestCase):
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
         decrypted_result = self.cc_obj.decrypt(
             encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
-
-        mock_client.assert_called_with('kms', region_name='us-east-1')
 
         self.assertEqual(decrypted_result['SECRET_NAME_1'], secret_one)
         self.assertEqual(decrypted_result['SECRET_NAME_2'], secret_two)
@@ -345,7 +357,6 @@ class TestDecrypt(unittest.TestCase):
             'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
         self.cc_obj.encrypt(
             'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
-        mock_client.return_value = mock.MagicMock()
 
         self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
@@ -357,8 +368,6 @@ class TestDecrypt(unittest.TestCase):
             'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
         decrypted_result = self.cc_obj.decrypt(
             plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
-
-        mock_client.assert_called_with('kms', region_name='us-east-1')
 
         self.assertEqual(decrypted_result['SECRET_NAME_1'], secret_one)
         self.assertEqual(decrypted_result['SECRET_NAME_2'], secret_two)
@@ -380,7 +389,6 @@ class TestBlobEncryptDecrypt(unittest.TestCase):
     def test_blob_decrypt_secret_with_kms(self, mock_client):
         secret = 'DDD'
         secret_blob = self.cc_obj.blob_encrypt(secret, TEST_PUBLIC_KEY)
-        mock_client.return_value = mock.MagicMock()
 
         self.cc_obj = code_crypt.CodeCrypt(
             kms_key_id=KMS_KEY_ID,
@@ -393,8 +401,6 @@ class TestBlobEncryptDecrypt(unittest.TestCase):
         decrypted_result = self.cc_obj.blob_decrypt(
             secret_blob,
             encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
-
-        mock_client.assert_called_with('kms', region_name='us-east-1')
 
         self.assertEqual(decrypted_result, secret)
 

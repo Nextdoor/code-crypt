@@ -6,6 +6,7 @@ import logging
 import os
 
 from base64 import b64encode, b64decode
+from botocore.client import Config
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
@@ -83,7 +84,13 @@ class CodeCrypt:
 
     def _init_kms_client(self, aws_region):
         '''Initializes a kms boto3 client.'''
-        self.kms = boto3.client('kms', region_name=aws_region)
+        config = Config(
+            region_name=aws_region,
+            connect_timeout=5,
+            read_timeout=10,
+            retries=dict(max_attempts=4))
+
+        self.kms = boto3.client('kms', config=config)
 
     def _init_dirs(self, data_dir):
         '''Sets and create the Code Crypt data directory which contains secrets
