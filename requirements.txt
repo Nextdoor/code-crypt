@@ -1,2 +1,3 @@
 boto3>=1.4.0
+botocore>=1.6.0
 cryptography>=1.6
