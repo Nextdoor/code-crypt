@@ -2,7 +2,7 @@
 class CodeCryptError(Exception):
     '''Base Exception for Code Crypt'''
     def __init__(self, message=""):
-        if message is not "":
+        if message != "":
             self.message = "%s: %s" % (self.__class__.__name__, message)
         else:
             self.message = self.__class__.__name__
