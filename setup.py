@@ -1,4 +1,4 @@
-# Copyright 2017 Nextdoor.com, Inc.
+# Copyright 2017-2022 Nextdoor.com, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,29 +14,26 @@
 
 import os
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 from code_crypt.metadata import __desc__, __version__
 
-PACKAGE = 'code_crypt'
+PACKAGE = "code_crypt"
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 setup(
     name=PACKAGE,
     version=__version__,
     description=__desc__,
-    long_description=open('%s/README.md' % DIR, 'rb').read().decode('utf8'),
-    author='Nextdoor Engineering',
-    author_email='nehal@nextdoor.com',
-    url='https://github.com/Nextdoor/code-crypt',
-    download_url='https://github.com/Nextdoor/code-crypt/tarball/0.1.3',
-    license='Apache License, Version 2.0',
+    long_description=open(f"{DIR}/README.md", "rb").read().decode("utf8"),
+    author="Nextdoor Engineering",
+    author_email="nehal@nextdoor.com",
+    url="https://github.com/Nextdoor/code-crypt",
+    download_url=f"https://github.com/Nextdoor/code-crypt/tarball/{__version__}",
+    license="Apache License, Version 2.0",
     packages=find_packages(),
-    test_suite='nose.collector',
-    tests_require=open('%s/requirements.test.txt' % DIR).readlines(),
+    tests_require=open(f"{DIR}/requirements.test.txt").readlines(),
     setup_requires=[],
-    install_requires=open('%s/requirements.txt' % DIR).readlines(),
-    entry_points={
-        'console_scripts': [
-            'code-crypt = code_crypt.cli:main']}
+    install_requires=open(f"{DIR}/requirements.txt").readlines(),
+    entry_points={"console_scripts": ["code-crypt = code_crypt.cli:main"]},
 )

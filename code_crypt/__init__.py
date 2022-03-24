@@ -12,4 +12,4 @@
 #
 # Copyright 2017 Nextdoor.com, Inc
 
-__author__ = 'Nehal Patel (nehal@nextdoor.com)'
+__author__ = "Nehal Patel (nehal@nextdoor.com)"

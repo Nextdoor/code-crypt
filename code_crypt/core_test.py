@@ -1,24 +1,24 @@
 # coding: utf8
 
 import base64
-import mock
 import os
 import shutil
 import tempfile
 import unittest
 
+import mock
 from botocore.client import Config
 
 from code_crypt import core as code_crypt
 from code_crypt import errors
 
 APP_ROOT = tempfile.mkdtemp()
-DATA_DIR = u'code_crypt/data'
-ENV = u'test'
-EXT = u'.bin'
-KMS_KEY_ID = u'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+DATA_DIR = "code_crypt/data"
+ENV = "test"
+EXT = ".bin"
+KMS_KEY_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
-TEST_VALID_JSON = u"""{
+TEST_VALID_JSON = """{
   "SECRET_NAME_A": "AAA",
   "SECRET_NAME_B": "BBB"
 }"""
@@ -61,7 +61,7 @@ qobQ0eUCgYEAoMhv5SsaFyk53pjXuqllX4tOiq2FAC8iUfnmGoXOAgOMb/Y0DxZo
 RnzPabvLpiSymUdlOMiTOBG1IEioY48rYt/JRzwywcZJ24dm3FE5/cM=
 -----END RSA PRIVATE KEY-----"""
 
-TEST_ENCRYPTED_PRIVATE_KEY = u"""AQICAHhiG23RsuSTqwlDgwSBWuBR8vtuEXp93gSa1U3HT2
+TEST_ENCRYPTED_PRIVATE_KEY = """AQICAHhiG23RsuSTqwlDgwSBWuBR8vtuEXp93gSa1U3HT2
 B6gwFXBr/FJsoxfaluFn9dEQaXAAAG9zCCBvMGCSqGSIb3DQEHBqCCBuQwggbgAgEAMIIG2QYJKoZI
 hvcNAQcBMB4GCWCGSAFlAwQBLjARBAwRxVHAc1aReGMBLLUCARCAggaqcBmtFSHgQYH8xRJCnkcNyc
 5HAtYG0jz+yA/DUKyWNaaPzqdx2+sFYVttHEjv/P5i01DwYuzn5AT7dSi73cTvXn0znShV+GsGC7WQ
@@ -96,7 +96,7 @@ CMJ0pdKGEMy/44aY1Y2cq7AXC5SPH+ie+iAzs/keOvBbjbniJK4Uf+PMQJq0KMjzLyw0KXYS6RzinW
 n91rMuBMWam1FHtcPdLeXFw1NX68NtUfiB48keI1tBgo="""
 
 # Sample RSA Private Key
-LARGE_SECRET = u"""-----BEGIN RSA PRIVATE KEY-----
+LARGE_SECRET = """-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUp
 wmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ5
 1s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQABAoGAFijko56+qGyN8M0RVyaRAXz++xTqHBLh
@@ -110,7 +110,7 @@ U9VQQSQzY1oZMVX8i1m5WUTLPz2yLJIBQVdXqhMCQBGoiuSoSjafUhV7i1cEGpb88h5NBYZzWXGZ
 37sJ5QsW+sJyoNde3xH8vdXhzU7eT82D6X/scw9RZz+/6rCJ4p0=
 -----END RSA PRIVATE KEY-----"""
 
-TEST_BASE64_TEXT = u"""QmFzZTY0IGlzIGEgZ3JvdXAgb2Ygc2ltaWxhciBiaW5hcnktdG8tdG
+TEST_BASE64_TEXT = """QmFzZTY0IGlzIGEgZ3JvdXAgb2Ygc2ltaWxhciBiaW5hcnktdG8tdG
 V4dCBlbmNvZGluZyBzY2hlbWVzIHRoYXQgcmVwcmVzZW50IGJpbmFyeSBkYXRhIGluIGFuIEFTQ0l
 JIHN0cmluZyBmb3JtYXQgYnkgdHJhbnNsYXRpbmcgaXQgaW50byBhIHJhZGl4LTY0IHJlcHJlc2Vu
 dGF0aW9uLiBUaGUgdGVybSBCYXNlNjQgb3JpZ2luYXRlcyBmcm9tIGEgc3BlY2lmaWMgTUlNRSBjb
@@ -119,7 +119,6 @@ FjdGx5IDYgYml0cyBvZiBkYXRhLg=="""
 
 
 class TestGenerateKeyPair(unittest.TestCase):
-
     def _is_base64(self, s):
         try:
             base64.b64decode(s)
@@ -130,82 +129,77 @@ class TestGenerateKeyPair(unittest.TestCase):
 
     def setUp(self):
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
         self.expected_public_key_file = os.path.join(
-            APP_ROOT, DATA_DIR, 'keys', ENV, 'public_key.asc')
+            APP_ROOT, DATA_DIR, "keys", ENV, "public_key.asc"
+        )
 
         self.expected_private_key_file = os.path.join(
-            APP_ROOT, DATA_DIR, 'keys', ENV, 'encrypted_private_key.pem')
+            APP_ROOT, DATA_DIR, "keys", ENV, "encrypted_private_key.pem"
+        )
 
     def test_generate_key_pair_with_missing_private_key(self):
-        with open(self.expected_public_key_file, 'wb') as f:
-            f.write(b'')
+        with open(self.expected_public_key_file, "wb") as f:
+            f.write(b"")
 
         self.assertRaises(
-            errors.CodeCryptError,
-            lambda: self.cc_obj.generate_key_pair())
+            errors.CodeCryptError, lambda: self.cc_obj.generate_key_pair()
+        )
 
     def test_generate_key_pair_with_missing_public_key_only(self):
-        with open(self.expected_private_key_file, 'wb') as f:
-            f.write(b'')
+        with open(self.expected_private_key_file, "wb") as f:
+            f.write(b"")
 
         self.assertRaises(
-            errors.CodeCryptError,
-            lambda: self.cc_obj.generate_key_pair())
+            errors.CodeCryptError, lambda: self.cc_obj.generate_key_pair()
+        )
 
     @mock.patch("boto3.client")
-    def test_kms_config(
-            self, mock_client):
+    def test_kms_config(self, mock_client):
         mock_client.return_value = mock.MagicMock()
 
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
         self.cc_obj.kms.encrypt.return_value = {
-            'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
+            "CiphertextBlob": TEST_PLAINTEXT_PRIVATE_KEY
+        }
 
         self.cc_obj.generate_key_pair()
 
-        self.assertEqual('kms', mock_client.call_args[0][0])
+        self.assertEqual("kms", mock_client.call_args[0][0])
 
-        assert isinstance(mock_client.call_args[1]['config'], Config)
-        self.assertEqual(
-            'us-east-1', mock_client.call_args[1]['config'].region_name)
+        assert isinstance(mock_client.call_args[1]["config"], Config)
+        self.assertEqual("us-east-1", mock_client.call_args[1]["config"].region_name)
 
     @mock.patch("boto3.client")
-    def test_generate_key_pair_with_no_existing_keys(
-            self, mock_client):
+    def test_generate_key_pair_with_no_existing_keys(self, mock_client):
 
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
         self.cc_obj.kms.encrypt.return_value = {
-            'CiphertextBlob': TEST_PLAINTEXT_PRIVATE_KEY}
+            "CiphertextBlob": TEST_PLAINTEXT_PRIVATE_KEY
+        }
 
         self.cc_obj.generate_key_pair()
 
         try:
-            with open(self.expected_public_key_file, 'r') as f:
+            with open(self.expected_public_key_file, "r") as f:
                 public_key = f.read()
 
-            with open(self.expected_private_key_file, 'r') as f:
+            with open(self.expected_private_key_file, "r") as f:
                 private_key = f.read()
 
         except IOError:
-            print('Cannot write out generate keys.')
+            print("Cannot write out generate keys.")
             exit(2)
 
-        self.assertTrue(u'BEGIN PUBLIC' in public_key.split("\n")[0])
+        self.assertTrue("BEGIN PUBLIC" in public_key.split("\n")[0])
         self.assertTrue(self._is_base64(private_key))
 
     def tearDown(self):
@@ -213,194 +207,171 @@ class TestGenerateKeyPair(unittest.TestCase):
 
 
 class TestImportSecrets(unittest.TestCase):
-
     def setUp(self):
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
     def test_import_secrets_with_invalid_secrets_json(self):
         self.assertRaises(
             errors.InputError,
-            lambda: self.cc_obj.import_secrets(
-                '{foo=bar}', TEST_PUBLIC_KEY))
+            lambda: self.cc_obj.import_secrets("{foo=bar}", TEST_PUBLIC_KEY),
+        )
 
     def test_import_secrets_with_valid_data(self):
         self.cc_obj.import_secrets(TEST_VALID_JSON, TEST_PUBLIC_KEY)
 
         decrypted_result = self.cc_obj.decrypt(
-            'SECRET_NAME_A', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
-        self.assertEqual(decrypted_result, 'AAA')
+            "SECRET_NAME_A", plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
+        self.assertEqual(decrypted_result, "AAA")
 
         decrypted_result = self.cc_obj.decrypt(
-            'SECRET_NAME_B', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
-        self.assertEqual(decrypted_result, 'BBB')
+            "SECRET_NAME_B", plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
+        self.assertEqual(decrypted_result, "BBB")
 
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
 
 class TestDecrypt(unittest.TestCase):
-
     def setUp(self):
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
     def test_decrypt_with_missing_private_key_file(self):
-        self.assertRaises(
-            errors.InputError, lambda: self.cc_obj.decrypt('FOO'))
+        self.assertRaises(errors.InputError, lambda: self.cc_obj.decrypt("FOO"))
 
     def test_decrypt_with_malformed_private_key(self):
         self.assertRaises(
-            errors.DecryptorError,
-            lambda: self.cc_obj.decrypt('FOO', 'bar'))
+            errors.DecryptorError, lambda: self.cc_obj.decrypt("FOO", "bar")
+        )
 
     def test_decrypt_with_missing_secret(self):
         decrypted_result = self.cc_obj.decrypt(
-            'FOO', plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
+            "FOO", plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
         self.assertIsNone(decrypted_result)
 
     def test_decrypt_secret_with_plaintext_private_key(self):
-        self.cc_obj.encrypt('SECRET_NAME_CCC', 'CCC', TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt("SECRET_NAME_CCC", "CCC", TEST_PUBLIC_KEY)
 
         decrypted_result = self.cc_obj.decrypt(
-            'SECRET_NAME_CCC',
-            plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
-        self.assertEqual(decrypted_result, 'CCC')
+            "SECRET_NAME_CCC", plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
+        self.assertEqual(decrypted_result, "CCC")
 
     def test_decrypt_secret_with_invalid_kms_context(self):
         self.assertRaises(
             errors.KmsError,
             lambda: self.cc_obj.decrypt(
-                encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY))
+                encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY
+            ),
+        )
 
     def test_decrypt_secret_with_missing_kms_key(self):
-        self.assertRaises(
-            errors.InputError,
-            lambda: self.cc_obj.decrypt('FOO'))
+        self.assertRaises(errors.InputError, lambda: self.cc_obj.decrypt("FOO"))
 
     def test_decrypt_all_with_no_secrets(self):
         decrypted_result = self.cc_obj.decrypt(
-            plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
-        self.assertEquals(decrypted_result, {})
+            plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
+        self.assertEqual(decrypted_result, {})
 
     @mock.patch("boto3.client")
     def test_decrypt_secret_with_kms(self, mock_client):
-        secret = 'DDD'
-        self.cc_obj.encrypt('SECRET_NAME_DDD', secret, TEST_PUBLIC_KEY)
+        secret = "DDD"
+        self.cc_obj.encrypt("SECRET_NAME_DDD", secret, TEST_PUBLIC_KEY)
 
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
-        self.cc_obj.kms.decrypt.return_value = {
-            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        self.cc_obj.kms.decrypt.return_value = {"Plaintext": TEST_PLAINTEXT_PRIVATE_KEY}
         decrypted_result = self.cc_obj.decrypt(
-            'SECRET_NAME_DDD',
-            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
+            "SECRET_NAME_DDD", encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY
+        )
 
         self.assertEqual(decrypted_result, secret)
 
     @mock.patch("boto3.client")
     def test_decrypt_large_secret_with_kms(self, mock_client):
-        self.cc_obj.encrypt('SECRET_NAME_DDD', LARGE_SECRET, TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt("SECRET_NAME_DDD", LARGE_SECRET, TEST_PUBLIC_KEY)
 
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
-        self.cc_obj.kms.decrypt.return_value = {
-            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        self.cc_obj.kms.decrypt.return_value = {"Plaintext": TEST_PLAINTEXT_PRIVATE_KEY}
         decrypted_result = self.cc_obj.decrypt(
-            'SECRET_NAME_DDD',
-            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
+            "SECRET_NAME_DDD", encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY
+        )
 
         self.assertEqual(decrypted_result, LARGE_SECRET)
 
     @mock.patch("boto3.client")
     def test_decrypt_explicit_all_with_kms(self, mock_client):
-        secret_one = 'one'
-        secret_two = 'two'
-        self.cc_obj.encrypt(
-            'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
-        self.cc_obj.encrypt(
-            'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
+        secret_one = "one"
+        secret_two = "two"
+        self.cc_obj.encrypt("SECRET_NAME_1", secret_one, public_key=TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt("SECRET_NAME_2", secret_two, public_key=TEST_PUBLIC_KEY)
 
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
-        self.cc_obj.kms.decrypt.return_value = {
-            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        self.cc_obj.kms.decrypt.return_value = {"Plaintext": TEST_PLAINTEXT_PRIVATE_KEY}
         decrypted_result = self.cc_obj.decrypt(
-            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
+            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY
+        )
 
-        self.assertEqual(decrypted_result['SECRET_NAME_1'], secret_one)
-        self.assertEqual(decrypted_result['SECRET_NAME_2'], secret_two)
+        self.assertEqual(decrypted_result["SECRET_NAME_1"], secret_one)
+        self.assertEqual(decrypted_result["SECRET_NAME_2"], secret_two)
 
     @mock.patch("boto3.client")
     def test_decrypt_all_with_kms(self, mock_client):
-        secret_one = 'one'
-        secret_two = 'two'
-        self.cc_obj.encrypt(
-            'SECRET_NAME_1', secret_one, public_key=TEST_PUBLIC_KEY)
-        self.cc_obj.encrypt(
-            'SECRET_NAME_2', secret_two, public_key=TEST_PUBLIC_KEY)
+        secret_one = "one"
+        secret_two = "two"
+        self.cc_obj.encrypt("SECRET_NAME_1", secret_one, public_key=TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt("SECRET_NAME_2", secret_two, public_key=TEST_PUBLIC_KEY)
 
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
-        self.cc_obj.kms.decrypt.return_value = {
-            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        self.cc_obj.kms.decrypt.return_value = {"Plaintext": TEST_PLAINTEXT_PRIVATE_KEY}
         decrypted_result = self.cc_obj.decrypt(
-            plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
+            plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
 
-        self.assertEqual(decrypted_result['SECRET_NAME_1'], secret_one)
-        self.assertEqual(decrypted_result['SECRET_NAME_2'], secret_two)
+        self.assertEqual(decrypted_result["SECRET_NAME_1"], secret_one)
+        self.assertEqual(decrypted_result["SECRET_NAME_2"], secret_two)
 
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
 
 class TestBlobEncryptDecrypt(unittest.TestCase):
-
     def setUp(self):
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
     @mock.patch("boto3.client")
     def test_blob_decrypt_secret_with_kms(self, mock_client):
-        secret = 'DDD'
+        secret = "DDD"
         secret_blob = self.cc_obj.blob_encrypt(secret, TEST_PUBLIC_KEY)
 
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
-        self.cc_obj.kms.decrypt.return_value = {
-            'Plaintext': TEST_PLAINTEXT_PRIVATE_KEY}
+        self.cc_obj.kms.decrypt.return_value = {"Plaintext": TEST_PLAINTEXT_PRIVATE_KEY}
         decrypted_result = self.cc_obj.blob_decrypt(
-            secret_blob,
-            encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY)
+            secret_blob, encrypted_private_key=TEST_ENCRYPTED_PRIVATE_KEY
+        )
 
         self.assertEqual(decrypted_result, secret)
 
@@ -409,95 +380,91 @@ class TestBlobEncryptDecrypt(unittest.TestCase):
 
 
 class TestBlobDecrypt(unittest.TestCase):
-
     def setUp(self):
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
     def test_blob_decrypt_with_invalid_short_secret(self):
-        self.assertRaises(
-            errors.InputError,
-            lambda: self.cc_obj.blob_decrypt('FOO'))
+        self.assertRaises(errors.InputError, lambda: self.cc_obj.blob_decrypt("FOO"))
 
     def test_blob_decrypt_with_invalid_base64_value(self):
         self.assertRaises(
-            errors.InputError,
-            lambda: self.cc_obj.blob_decrypt('FOOFOOFOOFOOFOOFOOFOO'))
+            errors.InputError, lambda: self.cc_obj.blob_decrypt("FOOFOOFOOFOOFOOFOOFOO")
+        )
 
     def test_blob_decrypt_with_invalid_base64_decoded_value(self):
         self.assertRaises(
-            errors.InputError,
-            lambda: self.cc_obj.blob_decrypt(TEST_BASE64_TEXT))
+            errors.InputError, lambda: self.cc_obj.blob_decrypt(TEST_BASE64_TEXT)
+        )
 
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
 
 class TestEncrypt(unittest.TestCase):
-
     def setUp(self):
         self.cc_obj = code_crypt.CodeCrypt(
-            kms_key_id=KMS_KEY_ID,
-            app_root=APP_ROOT,
-            env=ENV,
-            ciphertext_ext=EXT)
+            kms_key_id=KMS_KEY_ID, app_root=APP_ROOT, env=ENV, ciphertext_ext=EXT
+        )
 
     def test_encrypt_with_missing_public_key(self):
-        self.assertRaises(
-            errors.InputError,
-            lambda: self.cc_obj.encrypt('FOO', 'BAR'))
+        self.assertRaises(errors.InputError, lambda: self.cc_obj.encrypt("FOO", "BAR"))
 
     def test_encrypt_with_malformed_public_key(self):
         self.assertRaises(
             errors.EncryptorError,
-            lambda: self.cc_obj.encrypt('FOO', 'BAR', 'SOME_BAD_KEY'))
+            lambda: self.cc_obj.encrypt("FOO", "BAR", "SOME_BAD_KEY"),
+        )
 
     def test_encrypt_with_zero_length_secret_name(self):
-        secret_name = ''
-        secret = 'AAA'
+        secret_name = ""
+        secret = "AAA"
         self.assertRaises(
             errors.InputError,
             lambda: self.cc_obj.encrypt(
-                secret_name, secret, public_key=TEST_PUBLIC_KEY))
+                secret_name, secret, public_key=TEST_PUBLIC_KEY
+            ),
+        )
 
     def test_encrypt_with_non_ascii_secret_name(self):
-        secret_name = u'试'
-        secret = 'AAA'
+        secret_name = "试"
+        secret = "AAA"
         self.assertRaises(
             errors.InputError,
             lambda: self.cc_obj.encrypt(
-                secret_name, secret, public_key=TEST_PUBLIC_KEY))
+                secret_name, secret, public_key=TEST_PUBLIC_KEY
+            ),
+        )
 
     def test_encrypt_on_new_secret(self):
-        secret_name = 'NEW_SECRET'
-        secret = 'AAA'
+        secret_name = "NEW_SECRET"
+        secret = "AAA"
         self.cc_obj.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
 
         decrypted_result = self.cc_obj.decrypt(
-            secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
+            secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
 
-        self.assertEquals(decrypted_result, secret)
+        self.assertEqual(decrypted_result, secret)
 
     def test_encrypt_on_existing_secret(self):
-        secret_name = 'EXISTING_SECRET'
-        secret = 'AAA'
-        new_secret = 'BBB'
+        secret_name = "EXISTING_SECRET"
+        secret = "AAA"
+        new_secret = "BBB"
         self.cc_obj.encrypt(secret_name, secret, public_key=TEST_PUBLIC_KEY)
 
-        self.cc_obj.encrypt(
-            secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
+        self.cc_obj.encrypt(secret_name, new_secret, public_key=TEST_PUBLIC_KEY)
 
         decrypted_result = self.cc_obj.decrypt(
-            secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY)
+            secret_name, plaintext_private_key=TEST_PLAINTEXT_PRIVATE_KEY
+        )
 
-        self.assertEquals(decrypted_result, new_secret)
+        self.assertEqual(decrypted_result, new_secret)
 
     def tearDown(self):
         shutil.rmtree(APP_ROOT)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
