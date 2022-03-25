@@ -6,72 +6,64 @@ import logging
 import sys
 
 from code_crypt import core as code_crypt
-from code_crypt import defaults
-from code_crypt import errors
+from code_crypt import defaults, errors
 from code_crypt.metadata import __version__
 
 
 def get_config(argv):
-    parser = argparse.ArgumentParser(
-        prog=argv[0],
-        description='Code Crypt')
+    parser = argparse.ArgumentParser(prog=argv[0], description="Code Crypt")
 
-    parser.add_argument(
-        "--kms-key-id",
-        help="the KMS key id of the master key.")
+    parser.add_argument("--kms-key-id", help="the KMS key id of the master key.")
     parser.add_argument(
         "--env",
-        help="the environment context for secrets from %s "
-        "Defaults to '%s'" % (str(defaults.ENV_TAGS), defaults.DEFAULT_ENV),
-        default=defaults.DEFAULT_ENV)
+        help=f"the environment context for secrets from {str(defaults.ENV_TAGS)} Defaults to '{defaults.DEFAULT_ENV}'",
+        default=defaults.DEFAULT_ENV,
+    )
 
     action_group = parser.add_mutually_exclusive_group()
     action_group.add_argument(
         "--init",
-        help="initializes the repo with an asymmetric RSA key pair "
-        "('%s' is the default env)" % defaults.DEFAULT_ENV,
-        action="store_true")
+        help=f"initializes the repo with an asymmetric RSA key pair ('{defaults.DEFAULT_ENV}' is the default env)",
+        action="store_true",
+    )
+    action_group.add_argument("--decrypt", help="decrypt and print a single secret")
     action_group.add_argument(
-        "--decrypt",
-        help="decrypt and print a single secret")
+        "--decrypt-all", help="decrypt and print all secrets", action="store_true"
+    )
     action_group.add_argument(
-        "--decrypt-all",
-        help="decrypt and print all secrets",
-        action="store_true")
-    action_group.add_argument(
-        "--import-secrets",
-        help="imports and encrypts secrets from a json file")
+        "--import-secrets", help="imports and encrypts secrets from a json file"
+    )
     action_group.add_argument(
         "--encrypt",
         help="encrypts a single secret (usage: "
-             "--encrypt SOME_SECRET_NAME=some_secret_value)")
+        "--encrypt SOME_SECRET_NAME=some_secret_value)",
+    )
     action_group.add_argument(
         "--blob-encrypt",
         help="encrypts a single secret and returns an encrypted blob binary "
-             "(usage: --blob-encrypt some_secret_value)")
+        "(usage: --blob-encrypt some_secret_value)",
+    )
     action_group.add_argument(
         "--blob-decrypt",
         help="decrypts an encrypted blob binary and returns a plaintext "
-             "secret (usage: --blob-decrypt some_code_crypt_secret_blob)")
+        "secret (usage: --blob-decrypt some_code_crypt_secret_blob)",
+    )
     action_group.add_argument(
-        "-v",
-        "--version",
-        help="prints version",
-        action="store_true")
+        "-v", "--version", help="prints version", action="store_true"
+    )
 
     log_group = parser.add_mutually_exclusive_group()
     log_group.add_argument(
-        "--verbose",
-        help="increase output verbosity",
-        action="store_true")
+        "--verbose", help="increase output verbosity", action="store_true"
+    )
     log_group.add_argument(
-        "--debug",
-        help="enable full debug mode",
-        action="store_true")
+        "--debug", help="enable full debug mode", action="store_true"
+    )
     log_group.add_argument(
         "--quiet",
         help="enable quiet mode, no logs will be outputted",
-        action="store_true")
+        action="store_true",
+    )
 
     args = parser.parse_args(args=argv[1:])
     return args
@@ -90,17 +82,17 @@ def main():
         logging.basicConfig()
 
     if config.version:
-            print("Code Crypt - " + str(__version__))
-            return
+        print("Code Crypt - " + str(__version__))
+        return
 
     if config.env not in defaults.ENV_TAGS:
-        print("Error: env must be set to one of the following: %s" % (
-            str(defaults.ENV_TAGS)))
+        print(
+            f"Error: env must be set to one of the following: {str(defaults.ENV_TAGS)}"
+        )
         exit(1)
     env = config.env
 
-    code_crypt_obj = code_crypt.CodeCrypt(
-        kms_key_id=config.kms_key_id, env=env)
+    code_crypt_obj = code_crypt.CodeCrypt(kms_key_id=config.kms_key_id, env=env)
 
     try:
         if config.init:
@@ -118,19 +110,20 @@ def main():
         if config.import_secrets:
             secrets_file = config.import_secrets
             try:
-                with open(secrets_file, 'r') as f:
+                with open(secrets_file, "r") as f:
                     secrets_json = f.read()
             except IOError as e:
-                raise errors.InputError("secrets file '%s' does not exist" % (
-                    secrets_file))
+                raise errors.InputError(f"secrets file '{secrets_file}' does not exist")
             code_crypt_obj.import_secrets(secrets_json)
             return
         if config.encrypt:
-            if '=' not in config.encrypt:
-                raise errors.InputError("provide a key value pair (usage: "
-                                        "--encrypt SOME_SECRET_NAME=some_"
-                                        "secret_value)")
-            keyval = config.encrypt.split('=', 1)
+            if "=" not in config.encrypt:
+                raise errors.InputError(
+                    "provide a key value pair (usage: "
+                    "--encrypt SOME_SECRET_NAME=some_"
+                    "secret_value)"
+                )
+            keyval = config.encrypt.split("=", 1)
             code_crypt_obj.encrypt(keyval[0], keyval[1])
             return
         if config.blob_encrypt:
@@ -148,5 +141,5 @@ def main():
         exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
