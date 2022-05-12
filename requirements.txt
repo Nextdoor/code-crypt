@@ -1,2 +1,2 @@
-boto3>=1.21.25,<2.0.0
+boto3>=1.17.106,<2.0.0
 cryptography>=36.0.2 # ugh... they use major versions mainly now
