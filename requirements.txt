@@ -1,2 +1,4 @@
 boto3>=1.17.106,<2.0.0
 cryptography>=36.0.2 # ugh... they use major versions mainly now
+twine==6.1.0
+awscli==1.38.17
