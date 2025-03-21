@@ -31,9 +31,8 @@ jobs:
         make test
     - name: Build
       run: |
-          python setup.py sdist bdist_wheel
+        python setup.py sdist bdist_wheel
     - name: Publish
       run: |
-          aws codeartifact login --tool twine --repository dev-arvi --domain nextdoor --domain-owner 364942603424 --region us-west-2 &&
-          twine upload --repository dev-arvi dist/*        
+        aws codeartifact login --tool twine --repository dev-arvi --domain nextdoor --domain-owner 364942603424 --region us-west-2 && twine upload --repository dev-arvi dist/*        
       
