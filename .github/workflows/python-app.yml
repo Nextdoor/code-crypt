@@ -29,11 +29,11 @@ jobs:
     - name: Test
       run: |
         make test
-    - name: Upload to Codeartifact
+    - name: Build
       run: |
-          export TWINE_USERNAME=aws
-          export TWINE_PASSWORD=`aws codeartifact get-authorization-token --domain nextdoor --query authorizationToken --output text --region us-west-2 --duration 900`
-          export TWINE_REPOSITORY_URL=`aws codeartifact get-repository-endpoint --domain nextdoor --domain-owner 364942603424 --region us-west-2  --repository dev-arvi --format pypi --query repositoryEndpoint --output text`
           python setup.py sdist bdist_wheel
-          twine upload dist/*
+    - name: Publish
+      run: |
+          aws codeartifact login --tool twine --repository dev-arvi --domain nextdoor --domain-owner 364942603424 --region us-west-2 &&
+          twine upload --repository codeartifact dist/*        
       
