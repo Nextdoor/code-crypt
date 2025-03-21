@@ -35,5 +35,5 @@ jobs:
     - name: Publish
       run: |
           aws codeartifact login --tool twine --repository dev-arvi --domain nextdoor --domain-owner 364942603424 --region us-west-2 &&
-          twine upload --repository codeartifact dist/*        
+          twine upload --repository dev-arvi dist/*        
       
